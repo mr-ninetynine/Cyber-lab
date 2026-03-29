@@ -1,0 +1,5 @@
+{
+  "name": "Cyber-Lab",
+  "description": "Autonomous Security Intelligence System for vulnerability research and red teaming operations.",
+  "requestFramePermissions": ["microphone"]
+}
