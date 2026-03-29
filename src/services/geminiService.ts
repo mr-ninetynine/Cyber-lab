@@ -45,7 +45,78 @@ function isQuotaExceeded(error: any): boolean {
   );
 }
 
+function parseError(text: string, defaultMessage: string): string {
+  try {
+    // Helper to extract message from various error formats
+    const extractMessage = (obj: any): string | null => {
+      if (!obj) return null;
+      
+      // If it's a string, try to parse it as JSON or check for ApiError prefix
+      if (typeof obj === 'string') {
+        let cleaned = obj.trim();
+        if (cleaned.includes('ApiError:')) {
+          cleaned = cleaned.split('ApiError:')[1].trim();
+        }
+        
+        if (cleaned.startsWith('{')) {
+          try {
+            return extractMessage(JSON.parse(cleaned));
+          } catch (e) {
+            return cleaned;
+          }
+        }
+        return cleaned;
+      }
+
+      // If it's an object, look for common error fields
+      if (typeof obj === 'object') {
+        // Handle @google/genai specific nested error structure
+        const errorObj = obj.error || obj;
+        
+        // If the error part is a string, it might be stringified JSON
+        if (typeof errorObj === 'string') {
+          return extractMessage(errorObj);
+        }
+        
+        if (errorObj.message) return extractMessage(errorObj.message);
+        if (errorObj.details && Array.isArray(errorObj.details)) {
+          const msg = errorObj.details.find((d: any) => d.message)?.message;
+          if (msg) return msg;
+        }
+        return errorObj.status || JSON.stringify(errorObj);
+      }
+      
+      return String(obj);
+    };
+
+    const parsed = JSON.parse(text);
+    const message = extractMessage(parsed);
+    return message || defaultMessage;
+  } catch (e) {
+    // If top-level is not JSON, check if it contains ApiError prefix
+    let cleaned = text;
+    if (text.includes('ApiError:')) {
+      cleaned = text.split('ApiError:')[1].trim();
+      try {
+        const parsed = JSON.parse(cleaned);
+        const message = (parsed.error && parsed.error.message) || parsed.message || JSON.stringify(parsed);
+        if (typeof message === 'string' && message.startsWith('{')) {
+          try {
+            const nested = JSON.parse(message);
+            return (nested.error && nested.error.message) || nested.message || message;
+          } catch (err) {}
+        }
+        return message;
+      } catch (err) {
+        return cleaned;
+      }
+    }
+    return text || defaultMessage;
+  }
+}
+
 export async function* generateCyberLabResponse(prompt: string, files: AttachedFile[] = [], retryCount = 0): any {
+  console.log('Generating Cyber-Lab response for prompt:', prompt.slice(0, 50) + '...');
   try {
     const response = await fetch("/api/gemini/chat", {
       method: "POST",
@@ -55,16 +126,7 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
 
     if (!response.ok) {
       const text = await response.text();
-      let errorMessage = "Uplink failure";
-      try {
-        const errorData = JSON.parse(text);
-        errorMessage = typeof errorData.error === 'object' 
-          ? JSON.stringify(errorData.error) 
-          : (errorData.error || errorMessage);
-      } catch (e) {
-        errorMessage = `Server Error (${response.status}): ${text.slice(0, 500)}...`;
-      }
-      throw new Error(errorMessage);
+      throw new Error(parseError(text, `Server Error (${response.status})`));
     }
 
     const reader = response.body?.getReader();
@@ -96,11 +158,12 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
     }
   } catch (error: any) {
     console.error("Cyber-Lab Uplink Error:", error);
-    yield `ERROR: ${error?.message || "UNKNOWN SYSTEM FAILURE"}`;
+    throw error;
   }
 }
 
 export async function transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
+  console.log('Transcribing audio with mimeType:', mimeType);
   try {
     const response = await fetch("/api/gemini/transcribe", {
       method: "POST",
@@ -110,16 +173,7 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
 
     if (!response.ok) {
       const text = await response.text();
-      let errorMessage = "Transcription failure";
-      try {
-        const errorData = JSON.parse(text);
-        errorMessage = typeof errorData.error === 'object' 
-          ? JSON.stringify(errorData.error) 
-          : (errorData.error || errorMessage);
-      } catch (e) {
-        errorMessage = `Server Error (${response.status}): ${text.slice(0, 500)}...`;
-      }
-      throw new Error(errorMessage);
+      throw new Error(parseError(text, `Transcription Error (${response.status})`));
     }
 
     const data = await response.json();
@@ -131,6 +185,7 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
 }
 
 export async function generateSpeech(text: string): Promise<string> {
+  console.log('Generating speech for text length:', text.length);
   try {
     const response = await fetch("/api/gemini/tts", {
       method: "POST",
@@ -140,16 +195,7 @@ export async function generateSpeech(text: string): Promise<string> {
 
     if (!response.ok) {
       const text = await response.text();
-      let errorMessage = "TTS failure";
-      try {
-        const errorData = JSON.parse(text);
-        errorMessage = typeof errorData.error === 'object' 
-          ? JSON.stringify(errorData.error) 
-          : (errorData.error || errorMessage);
-      } catch (e) {
-        errorMessage = `Server Error (${response.status}): ${text.slice(0, 500)}...`;
-      }
-      throw new Error(errorMessage);
+      throw new Error(parseError(text, `TTS Error (${response.status})`));
     }
 
     const data = await response.json();

@@ -37,41 +37,78 @@ async function startServer() {
     try {
       const dotenv = await import("dotenv");
       // Use override: true to allow local .env to take precedence for debugging
-      const result = dotenv.config({ override: true });
-      if (result.error) {
-        console.warn("dotenv found but failed to load:", result.error);
-      } else {
-        console.log("Environment variables loaded from .env (with override)");
-      }
+      dotenv.config({ override: true });
     } catch (e) {
-      console.warn("dotenv not found, skipping local env loading");
+      // dotenv package not installed or .env missing, which is fine
     }
   }
 
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '5mb' })); // Reduced limit for Vercel compatibility
+  app.use(express.json({ limit: '20mb' })); // Increased limit for larger file uploads
 
-  let apiKey = process.env.GEMINI_API_KEY;
-  if (apiKey) {
-    console.log(`Original GEMINI_API_KEY length: ${apiKey.length}`);
-    // Clean the key: remove quotes, non-printable characters, and trim
-    apiKey = apiKey.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
-    console.log(`Final GEMINI_API_KEY length: ${apiKey.length}`);
-    console.log(`Final GEMINI_API_KEY in use (starts with: ${apiKey.substring(0, 10)}...)`);
-  } else {
-    console.warn("GEMINI_API_KEY is NOT defined in the environment.");
+  function getAI() {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
+    
+    let keyToUse = geminiKey || apiKey;
+    const source = geminiKey ? "GEMINI_API_KEY" : (apiKey ? "API_KEY" : "NONE");
+    
+    if (keyToUse) {
+      // Clean the key: remove quotes, non-printable characters, and trim
+      keyToUse = keyToUse.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
+      
+      const isPlaceholder = keyToUse.includes("TODO") || keyToUse.includes("YOUR_API_KEY") || keyToUse.length < 10;
+      
+      console.log(`[getAI] Source: ${source}, Length: ${keyToUse.length}, Masked: ${keyToUse.substring(0, 4)}...${keyToUse.substring(keyToUse.length - 4)}, Placeholder: ${isPlaceholder}`);
+      
+      if (isPlaceholder) {
+        console.warn(`[getAI] API key from ${source} appears to be a placeholder or invalid.`);
+        return null;
+      }
+      
+      return new GoogleGenAI({ apiKey: keyToUse });
+    }
+    
+    console.warn("[getAI] No API key found in GEMINI_API_KEY or API_KEY environment variables.");
+    return null;
   }
-  const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
   // Health check
   app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", mode: process.env.NODE_ENV || "development" });
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
+    
+    let keyToUse = geminiKey || apiKey;
+    const source = geminiKey ? "GEMINI_API_KEY" : (apiKey ? "API_KEY" : "NONE");
+    
+    let diagnostic = {
+      status: "ok",
+      mode: process.env.NODE_ENV || "development",
+      isKeyConfigured: false,
+      source: source,
+      keyLength: 0,
+      maskedKey: "none"
+    };
+
+    if (keyToUse) {
+      const cleanedKey = keyToUse.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
+      const isPlaceholder = cleanedKey.includes("TODO") || cleanedKey.includes("YOUR_API_KEY") || cleanedKey.length < 10;
+      
+      diagnostic.isKeyConfigured = !isPlaceholder;
+      diagnostic.keyLength = cleanedKey.length;
+      if (cleanedKey.length > 8) {
+        diagnostic.maskedKey = `${cleanedKey.substring(0, 4)}...${cleanedKey.substring(cleanedKey.length - 4)}`;
+      }
+    }
+
+    res.json(diagnostic);
   });
 
   // API Routes
   app.post("/api/gemini/chat", async (req, res) => {
+    const ai = getAI();
     if (!ai) return res.status(500).json({ error: "GEMINI_API_KEY is not defined" });
     
     const { prompt, files } = req.body;
@@ -90,9 +127,9 @@ async function startServer() {
         });
       }
 
-      // Using gemini-3.1-flash-lite-preview as a fallback
+      // Using gemini-3-flash-preview as the standard model
       const response = await ai.models.generateContentStream({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3-flash-preview",
         contents: [{ role: "user", parts }],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
@@ -113,18 +150,35 @@ async function startServer() {
       res.end();
     } catch (error: any) {
       console.error("Gemini Chat Error:", error);
-      res.status(500).json({ error: error.message });
+      let message = error.message;
+      try {
+        // If the error message is a stringified JSON (common with @google/genai), parse it
+        if (typeof message === 'string' && message.startsWith('{')) {
+          const parsed = JSON.parse(message);
+          message = (parsed.error && parsed.error.message) || parsed.message || message;
+          
+          // If message is still a stringified JSON, parse it again
+          if (typeof message === 'string' && message.startsWith('{')) {
+            const nested = JSON.parse(message);
+            message = (nested.error && nested.error.message) || nested.message || message;
+          }
+        }
+      } catch (e) {
+        // Fallback to original message
+      }
+      res.status(500).json({ error: message });
     }
   });
 
   app.post("/api/gemini/transcribe", async (req, res) => {
+    const ai = getAI();
     if (!ai) return res.status(500).json({ error: "GEMINI_API_KEY is not defined" });
     
     const { base64Audio, mimeType } = req.body;
     
     try {
       const response = await ai.models.generateContent({
-        model: "gemini-3.1-flash-lite-preview",
+        model: "gemini-3-flash-preview",
         contents: [
           {
             role: "user",
@@ -149,11 +203,24 @@ async function startServer() {
       res.json({ text: response.text || "" });
     } catch (error: any) {
       console.error("Transcription Error:", error);
-      res.status(500).json({ error: error.message });
+      let message = error.message;
+      try {
+        if (typeof message === 'string' && message.startsWith('{')) {
+          const parsed = JSON.parse(message);
+          message = (parsed.error && parsed.error.message) || parsed.message || message;
+          
+          if (typeof message === 'string' && message.startsWith('{')) {
+            const nested = JSON.parse(message);
+            message = (nested.error && nested.error.message) || nested.message || message;
+          }
+        }
+      } catch (e) {}
+      res.status(500).json({ error: message });
     }
   });
 
   app.post("/api/gemini/tts", async (req, res) => {
+    const ai = getAI();
     if (!ai) return res.status(500).json({ error: "GEMINI_API_KEY is not defined" });
     
     const { text } = req.body;
@@ -185,7 +252,19 @@ async function startServer() {
       res.json({ audio: base64Audio });
     } catch (error: any) {
       console.error("TTS Error:", error);
-      res.status(500).json({ error: error.message });
+      let message = error.message;
+      try {
+        if (typeof message === 'string' && message.startsWith('{')) {
+          const parsed = JSON.parse(message);
+          message = (parsed.error && parsed.error.message) || parsed.message || message;
+          
+          if (typeof message === 'string' && message.startsWith('{')) {
+            const nested = JSON.parse(message);
+            message = (nested.error && nested.error.message) || nested.message || message;
+          }
+        }
+      } catch (e) {}
+      res.status(500).json({ error: message });
     }
   });
 

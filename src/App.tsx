@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, Component, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Terminal as TerminalIcon, 
@@ -45,7 +45,56 @@ const COMMON_PAYLOADS = [
   { name: 'RCE: Simple Bash', payload: '; id; whoami' },
 ];
 
+// Error Boundary Component
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: any }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: any) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: any, errorInfo: any) {
+    console.error("ErrorBoundary caught an error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="min-h-screen bg-pitch-black flex flex-col items-center justify-center p-6 text-center">
+          <div className="w-24 h-24 bg-aegis-red/20 rounded-full flex items-center justify-center mb-6 animate-pulse">
+            <Lock size={48} className="text-aegis-red" />
+          </div>
+          <h1 className="text-2xl font-bold matrix-text tracking-[0.2em] mb-4">CRITICAL SYSTEM FAILURE</h1>
+          <div className="max-w-md bg-black/60 border border-aegis-red/30 p-4 rounded font-mono text-xs text-aegis-red/80 mb-6 break-all">
+            {this.state.error?.message || "UNKNOWN_KERNEL_PANIC"}
+          </div>
+          <button 
+            onClick={() => window.location.reload()}
+            className="px-6 py-2 bg-aegis-red/20 border border-aegis-red/50 text-aegis-red rounded hover:bg-aegis-red/30 transition-all uppercase tracking-widest text-xs"
+          >
+            Reboot System
+          </button>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 export default function App() {
+  return (
+    <ErrorBoundary>
+      <CyberLabApp />
+    </ErrorBoundary>
+  );
+}
+
+function CyberLabApp() {
+  console.log('Cyber-Lab App initializing...');
   const [activeTab, setActiveTab] = useState<'terminal' | 'payloads'>('terminal');
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
@@ -55,6 +104,8 @@ export default function App() {
   const [voiceSupport, setVoiceSupport] = useState(true);
   const [progress, setProgress] = useState(0);
   const [statusText, setStatusText] = useState('SYSTEM IDLE');
+  const [apiError, setApiError] = useState<string | null>(null);
+  const [apiDiagnostic, setApiDiagnostic] = useState<any>(null);
   const [attachedFiles, setAttachedFiles] = useState<(AttachedFile & { name: string, id: string })[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -65,12 +116,15 @@ export default function App() {
 
   const startMediaRecorderRef = useRef<() => Promise<void>>(null);
 
+  const [useFallbackVoice, setUseFallbackVoice] = useState(false);
   const fallingBackRef = useRef(false);
 
   useEffect(() => {
+    console.log('Setting up SpeechRecognition...');
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
       if (SpeechRecognition) {
+        console.log('Native SpeechRecognition detected.');
         const recognition = new SpeechRecognition();
         recognition.continuous = false;
         recognition.interimResults = false;
@@ -78,6 +132,7 @@ export default function App() {
 
         recognition.onresult = (event: any) => {
           const transcript = event.results[0][0].transcript;
+          console.log('SpeechRecognition result:', transcript);
           setInput(transcript);
           setIsListening(false);
           setStatusText('VOICE CAPTURED');
@@ -91,9 +146,9 @@ export default function App() {
           if (event.error === 'network') {
             setStatusText('NETWORK ERROR - FALLING BACK');
             fallingBackRef.current = true;
-            if (startMediaRecorderRef.current) {
-              startMediaRecorderRef.current();
-            }
+            setUseFallbackVoice(true); // Remember to use fallback next time
+            // We don't call startMediaRecorder here anymore, we wait for onend
+            // to ensure the microphone is released by the native API.
           } else {
             setIsListening(false);
             setStatusText('VOICE ERROR');
@@ -101,7 +156,13 @@ export default function App() {
         };
 
         recognition.onend = () => {
-          if (!fallingBackRef.current) {
+          console.log('SpeechRecognition ended. Falling back:', fallingBackRef.current);
+          if (fallingBackRef.current) {
+            console.log('Triggering MediaRecorder fallback from onend...');
+            if (startMediaRecorderRef.current) {
+              startMediaRecorderRef.current();
+            }
+          } else {
             setIsListening(false);
           }
           fallingBackRef.current = false;
@@ -109,14 +170,17 @@ export default function App() {
 
         recognitionRef.current = recognition;
       } else {
+        console.log('Native SpeechRecognition NOT detected. Checking MediaRecorder...');
         // If SpeechRecognition is not supported, we'll use MediaRecorder which is more widely available
         const hasMediaRecorder = typeof window !== 'undefined' && !!window.MediaRecorder;
+        console.log('MediaRecorder support:', hasMediaRecorder);
         setVoiceSupport(hasMediaRecorder);
       }
     }
   }, []);
 
   const startMediaRecorder = async () => {
+    console.log('Starting MediaRecorder fallback...');
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
@@ -141,7 +205,11 @@ export default function App() {
       audioChunksRef.current = [];
 
       // Silence detection
-      const audioContext = new AudioContext();
+      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      if (audioContext.state === 'suspended') {
+        console.log('AudioContext suspended, resuming...');
+        await audioContext.resume();
+      }
       const source = audioContext.createMediaStreamSource(stream);
       const analyser = audioContext.createAnalyser();
       analyser.fftSize = 2048;
@@ -167,6 +235,7 @@ export default function App() {
 
         if (maxVal < SILENCE_THRESHOLD) {
           if (Date.now() - silenceStart > SILENCE_DURATION) {
+            console.log('Silence detected. Stopping MediaRecorder...');
             mediaRecorder.stop();
             return;
           }
@@ -177,22 +246,44 @@ export default function App() {
         requestAnimationFrame(checkSilence);
       };
 
+      mediaRecorder.onstart = () => {
+        console.log('MediaRecorder onstart event fired.');
+      };
+
       mediaRecorder.ondataavailable = (event) => {
         if (event.data.size > 0) {
+          console.log('Audio chunk received. Size:', event.data.size);
           audioChunksRef.current.push(event.data);
         }
       };
 
+      mediaRecorder.onpause = () => {
+        console.log('MediaRecorder onpause event fired.');
+      };
+
+      mediaRecorder.onerror = (event: any) => {
+        console.error('MediaRecorder error event:', event.error);
+        setStatusText('MIC ERROR');
+        setIsListening(false);
+      };
+
+      mediaRecorder.onresume = () => {
+        console.log('MediaRecorder onresume event fired.');
+      };
+
       mediaRecorder.onstop = async () => {
+        console.log('MediaRecorder stopped. Processing audio...');
         setIsListening(false);
         const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+        console.log('Recording mimeType:', actualMimeType);
         const audioBlob = new Blob(audioChunksRef.current, { type: actualMimeType });
+        console.log('Audio blob size:', audioBlob.size);
         setStatusText('TRANSCRIBING...');
         
-        try {
-          const reader = new FileReader();
-          reader.readAsDataURL(audioBlob);
-          reader.onloadend = async () => {
+        const reader = new FileReader();
+        reader.readAsDataURL(audioBlob);
+        reader.onloadend = async () => {
+          try {
             const base64Audio = (reader.result as string).split(',')[1];
             const transcript = await transcribeAudio(base64Audio, actualMimeType);
             if (transcript) {
@@ -203,11 +294,17 @@ export default function App() {
             } else {
               setStatusText('COULD NOT TRANSCRIBE');
             }
-          };
-        } catch (error) {
-          console.error('Transcription error:', error);
-          setStatusText('TRANSCRIPTION FAILED');
-        }
+          } catch (error: any) {
+            console.error('Transcription error:', error);
+            const errorMessage = error.message || String(error);
+            
+            if (errorMessage.includes("leaked") || errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("API key not valid")) {
+              setApiError("API_KEY_ERROR: Your Gemini API key is invalid or leaked. Please update it in the Settings menu.");
+            }
+            
+            setStatusText('TRANSCRIPTION FAILED');
+          }
+        };
         
         // Stop all tracks to release microphone
         stream.getTracks().forEach(track => track.stop());
@@ -215,6 +312,7 @@ export default function App() {
       };
 
       mediaRecorder.start();
+      console.log('MediaRecorder started.');
       setIsListening(true);
       setStatusText('LISTENING (UNIVERSAL)...');
       requestAnimationFrame(checkSilence);
@@ -229,6 +327,7 @@ export default function App() {
   (startMediaRecorderRef as any).current = startMediaRecorder;
 
   const toggleListening = () => {
+    console.log('Toggling listening. Current state:', isListening, 'Use fallback:', useFallbackVoice);
     if (isGenerating) {
       setStatusText('SYSTEM BUSY...');
       return;
@@ -250,8 +349,8 @@ export default function App() {
     }
 
     // Start listening
-    // Prefer native SpeechRecognition if available
-    if (recognitionRef.current) {
+    // Prefer native SpeechRecognition if available and not failing
+    if (recognitionRef.current && !useFallbackVoice) {
       try {
         recognitionRef.current.start();
         setIsListening(true);
@@ -338,13 +437,14 @@ export default function App() {
       
       setStatusText('SYSTEM IDLE');
     } catch (error: any) {
-      const isCooldown = error?.message === "TTS_QUOTA_COOLDOWN";
+      console.error("TTS Error:", error);
+      const errorMessage = error.message || String(error);
       
-      if (!isCooldown) {
-        console.error("TTS Error:", error);
-      } else {
-        console.warn("TTS Quota Cooldown: Switching to browser fallback.");
+      if (errorMessage.includes("leaked") || errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("API key not valid")) {
+        setApiError("API_KEY_ERROR: Your Gemini API key is invalid or leaked. Please update it in the Settings menu.");
       }
+
+      const isCooldown = error?.message === "TTS_QUOTA_COOLDOWN";
       
       const isQuotaError = error?.status === "RESOURCE_EXHAUSTED" || 
                           error?.message?.includes("429") || 
@@ -376,6 +476,47 @@ export default function App() {
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
+
+  useEffect(() => {
+    const checkKeyStatus = async () => {
+      try {
+        const response = await fetch('/api/health');
+        if (response.ok) {
+          const data = await response.json();
+          setApiDiagnostic(data);
+          if (!data.isKeyConfigured) {
+            setApiError(`API_KEY_ERROR: No valid key found in ${data.source}. (Length: ${data.keyLength})`);
+          } else {
+            setApiError(null);
+          }
+        }
+      } catch (e) {
+        console.warn('Failed to check API key status:', e);
+      }
+    };
+    checkKeyStatus();
+  }, []);
+
+  const handleReverify = async () => {
+    setStatusText('RE-VERIFYING UPLINK...');
+    try {
+      const response = await fetch('/api/health');
+      if (response.ok) {
+        const data = await response.json();
+        setApiDiagnostic(data);
+        if (data.isKeyConfigured) {
+          setApiError(null);
+          setStatusText('UPLINK RESTORED');
+          setTimeout(() => setStatusText('SYSTEM IDLE'), 2000);
+        } else {
+          setApiError(`API_KEY_ERROR: Key in ${data.source} is still invalid. (Length: ${data.keyLength})`);
+          setStatusText('UPLINK FAILED');
+        }
+      }
+    } catch (e) {
+      setStatusText('CONNECTION ERROR');
+    }
+  };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -413,6 +554,7 @@ export default function App() {
 
   const handleSend = async (overrideInput?: string, isVoiceRequest: boolean = false) => {
     const textToSend = overrideInput !== undefined ? overrideInput : input;
+    console.log('Handling send. Text:', textToSend.slice(0, 50) + '...', 'Voice:', isVoiceRequest);
     if ((!textToSend.trim() && attachedFiles.length === 0) || isGenerating) return;
 
     const userMessage: Message = { 
@@ -465,9 +607,18 @@ export default function App() {
         setProgress(0);
         setStatusText('SYSTEM IDLE');
       }, 2000);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'ERROR: UPLINK FAILED. CHECK SYSTEM LOGS.' }]);
+      const errorMessage = error.message || String(error);
+      
+      if (errorMessage.includes("leaked") || errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("API key not valid")) {
+        setApiError("API_KEY_ERROR: Your Gemini API key is invalid or leaked. Please update it in the Settings menu.");
+      }
+
+      setMessages(prev => [...prev, { 
+        role: 'assistant', 
+        content: `ERROR: UPLINK FAILED. ${(errorMessage.includes("leaked") || errorMessage.includes("API_KEY_INVALID") || errorMessage.includes("API key not valid")) ? "API KEY ERROR. PLEASE UPDATE IN SETTINGS." : "CHECK SYSTEM LOGS."}` 
+      }]);
       setStatusText('CRITICAL ERROR');
     } finally {
       setIsGenerating(false);
@@ -522,6 +673,44 @@ export default function App() {
           </button>
         </div>
       </header>
+
+      {/* API Error Banner */}
+      <AnimatePresence>
+        {apiError && (
+          <motion.div 
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-aegis-red/20 border-b border-aegis-red/50 p-3 flex items-center justify-between gap-4"
+          >
+            <div className="flex items-center gap-4">
+              <div className="flex flex-col gap-1">
+                <div className="flex items-center gap-3 text-aegis-red text-xs font-mono">
+                  <Lock size={16} className="shrink-0" />
+                  <span>{apiError}</span>
+                </div>
+                {apiDiagnostic?.maskedKey && apiDiagnostic.maskedKey !== "none" && (
+                  <div className="text-[9px] text-aegis-red/60 font-mono ml-7 uppercase tracking-tighter">
+                    CURRENT KEY: {apiDiagnostic.maskedKey}
+                  </div>
+                )}
+              </div>
+              <button 
+                onClick={handleReverify}
+                className="px-3 py-1 bg-aegis-red/20 border border-aegis-red/50 text-aegis-red rounded hover:bg-aegis-red/30 transition-all text-[10px] uppercase tracking-widest"
+              >
+                Re-Verify
+              </button>
+            </div>
+            <button 
+              onClick={() => setApiError(null)}
+              className="text-aegis-red/60 hover:text-aegis-red transition-colors"
+            >
+              <X size={16} />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Content */}
       <main className="flex-1 overflow-hidden flex flex-col max-w-6xl mx-auto w-full p-4 gap-4">
@@ -644,14 +833,30 @@ export default function App() {
                       <button 
                         onClick={toggleListening}
                         className={cn(
-                          "p-2 rounded transition-all",
+                          "p-2 rounded transition-all relative",
                           isListening ? "text-aegis-red animate-pulse bg-aegis-red/10" : "text-aegis-red/40 hover:text-aegis-red",
                           !voiceSupport && "opacity-30"
                         )}
-                        title={!voiceSupport ? "Voice Input Not Supported" : (isListening ? "Stop Listening" : "Voice Input")}
+                        title={!voiceSupport ? "Voice Input Not Supported" : (isListening ? "Stop Listening" : (useFallbackVoice ? "Universal Voice Input" : "Voice Input"))}
                       >
                         {!voiceSupport ? <MicOff size={16} /> : (isListening ? <Square size={16} /> : <Mic size={16} />)}
+                        {useFallbackVoice && !isListening && (
+                          <div className="absolute -top-1 -right-1 w-2 h-2 bg-aegis-red rounded-full animate-pulse" />
+                        )}
                       </button>
+                      {useFallbackVoice && (
+                        <button 
+                          onClick={() => {
+                            setUseFallbackVoice(false);
+                            setStatusText('NATIVE VOICE RESTORED');
+                            setTimeout(() => setStatusText('SYSTEM IDLE'), 2000);
+                          }}
+                          className="p-2 text-aegis-red/40 hover:text-aegis-red transition-all"
+                          title="Reset to Native Voice Input"
+                        >
+                          <Activity size={14} />
+                        </button>
+                      )}
                       <button 
                         onClick={() => {
                           setIsTtsEnabled(!isTtsEnabled);
