@@ -46,181 +46,88 @@ function isQuotaExceeded(error: any): boolean {
 }
 
 export async function* generateCyberLabResponse(prompt: string, files: AttachedFile[] = [], retryCount = 0): any {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not defined");
-  }
-  
-  const ai = new GoogleGenAI({ apiKey });
-
   try {
-    const parts: any[] = [{ text: prompt }];
-    
-    files.forEach(file => {
-      parts.push({
-        inlineData: {
-          data: file.data,
-          mimeType: file.mimeType
+    const response = await fetch("/api/gemini/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ prompt, files }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Uplink failure");
+    }
+
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("No response body");
+
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      buffer = lines.pop() || "";
+
+      for (const line of lines) {
+        if (line.startsWith("data: ")) {
+          const data = line.slice(6);
+          if (data === "[DONE]") return;
+          try {
+            const parsed = JSON.parse(data);
+            if (parsed.text) yield parsed.text;
+          } catch (e) {
+            console.error("Error parsing SSE data:", e);
+          }
         }
-      });
-    });
-
-    const response = await ai.models.generateContentStream({
-      model: "gemini-3.1-pro-preview",
-      contents: [{ role: "user", parts }],
-      config: {
-        systemInstruction: SYSTEM_INSTRUCTION,
-        maxOutputTokens: 4096,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
-      },
-    });
-
-    for await (const chunk of response) {
-      if (chunk.text) {
-        yield chunk.text;
       }
     }
   } catch (error: any) {
-    const isQuotaError = isQuotaExceeded(error);
-
-    if (isQuotaError && retryCount < 10) {
-      const delay = Math.pow(1.5, retryCount) * 1000 + Math.random() * 1000;
-      console.warn(`Text Quota exceeded. Retrying in ${Math.round(delay)}ms... (Attempt ${retryCount + 1})`);
-      if (retryCount === 0) yield "*(System: Uplink saturated. Initiating adaptive retry protocol...)* ";
-      await new Promise(resolve => setTimeout(resolve, delay));
-      yield* generateCyberLabResponse(prompt, files, retryCount + 1);
-      return;
-    }
-
     console.error("Cyber-Lab Uplink Error:", error);
-    
-    // Fallback to Flash model if Pro fails or quota is completely exhausted after retries
-    if (error?.message?.includes("INVALID_ARGUMENT") || error?.status === "INVALID_ARGUMENT" || isQuotaError) {
-      try {
-        console.warn("Switching to Flash fallback model due to Pro failure/quota.");
-        if (isQuotaError) yield "*(System: Pro-tier quota exhausted. Switching to high-speed Flash fallback...)* ";
-        const fallbackAi = new GoogleGenAI({ apiKey });
-        const fallbackResponse = await fallbackAi.models.generateContentStream({
-          model: "gemini-3-flash-preview",
-          contents: prompt,
-        });
-        
-        for await (const chunk of fallbackResponse) {
-          if (chunk.text) {
-            yield chunk.text;
-          }
-        }
-      } catch (fallbackError) {
-        console.error("Cyber-Lab Fallback Failed:", fallbackError);
-        yield "CRITICAL ERROR: ALL UPLINKS SATURATED. SYSTEM OFFLINE.";
-      }
-    } else {
-      yield `ERROR: ${error?.message || "UNKNOWN SYSTEM FAILURE"}`;
-    }
+    yield `ERROR: ${error?.message || "UNKNOWN SYSTEM FAILURE"}`;
   }
 }
 
 export async function transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not defined");
-  }
-  
-  const ai = new GoogleGenAI({ apiKey });
-
   try {
-    // Using gemini-3.1-flash-lite-preview for ultra-fast transcription
-    const response = await ai.models.generateContent({
-      model: "gemini-3.1-flash-lite-preview",
-      contents: [
-        {
-          role: "user",
-          parts: [
-            { text: "Listen with extreme care. Transcribe the following audio with 100% precision. Capture every word exactly as spoken, including subtle nuances, pauses, and emotional tone. It is critical that you do not miss a single word. Output ONLY the transcript text. If the audio is silent or unintelligible, return an empty string. Context: The user is having a conversation with 'Cyber-Lab', an advanced AI assistant." },
-            {
-              inlineData: {
-                data: base64Audio,
-                mimeType: mimeType
-              }
-            }
-          ]
-        }
-      ],
-      config: {
-        temperature: 0,
-        maxOutputTokens: 256, // Transcript should be short
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
-      }
+    const response = await fetch("/api/gemini/transcribe", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ base64Audio, mimeType }),
     });
 
-    return response.text || "";
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Transcription failure");
+    }
+
+    const data = await response.json();
+    return data.text || "";
   } catch (error) {
     console.error("Transcription Error:", error);
     throw error;
   }
 }
 
-export async function generateSpeech(text: string, retryCount = 0): Promise<string> {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) {
-    throw new Error("GEMINI_API_KEY is not defined");
-  }
-  
-  if (!text || text.trim().length === 0) {
-    throw new Error("Text for speech generation is empty");
-  }
-
-  // Circuit breaker for TTS
-  const now = Date.now();
-  if (now - lastQuotaErrorTime < QUOTA_COOLDOWN_MS) {
-    console.warn("TTS Circuit Breaker active. Skipping Gemini TTS.");
-    throw new Error("TTS_QUOTA_COOLDOWN");
-  }
-
-  // Sanitize text: remove markdown and special characters that might confuse the TTS model
-  const sanitizedText = text
-    .replace(/[*_#`~>]/g, '') // Remove markdown symbols
-    .replace(/\[.*?\]\(.*?\)/g, '') // Remove markdown links
-    .replace(/\n+/g, ' ') // Replace newlines with spaces
-    .trim();
-
-  const ai = new GoogleGenAI({ apiKey });
-
+export async function generateSpeech(text: string): Promise<string> {
   try {
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
-      contents: [{ parts: [{ text: `Say: ${sanitizedText}` }] }],
-      config: {
-        responseModalities: [Modality.AUDIO],
-        speechConfig: {
-          voiceConfig: {
-            // 'Puck', 'Charon', 'Kore', 'Fenrir', 'Zephyr'
-            prebuiltVoiceConfig: { voiceName: 'Puck' },
-          },
-        },
-      },
+    const response = await fetch("/api/gemini/tts", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text }),
     });
 
-    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-    if (!base64Audio) {
-      throw new Error("No audio data returned from Gemini TTS. The model might have returned a text response instead.");
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "TTS failure");
     }
-    return base64Audio;
-  } catch (error: any) {
-    // Handle 429 Quota Exceeded with exponential backoff
-    const isQuotaError = isQuotaExceeded(error);
 
-    if (isQuotaError) {
-      lastQuotaErrorTime = Date.now(); // Activate circuit breaker
-      
-      if (retryCount < 10) {
-        const delay = Math.pow(1.5, retryCount) * 1000 + Math.random() * 1000;
-        console.warn(`TTS Quota exceeded. Retrying in ${Math.round(delay)}ms... (Attempt ${retryCount + 1})`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        return generateSpeech(text, retryCount + 1);
-      }
-    }
-    
+    const data = await response.json();
+    return data.audio;
+  } catch (error) {
     console.error("Speech Generation Error:", error);
     throw error;
   }
