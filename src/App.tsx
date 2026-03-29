@@ -633,7 +633,7 @@ function CyberLabApp() {
         <div className="flex items-center gap-4">
           <div className="relative">
             <img 
-              src="../logo/logo_red-removebg-preview.png" 
+              src="/../logo/logo_red-removebg-preview.png" 
               alt="Devil Hunter Cyber Corps" 
               className="w-16 h-16 object-contain relative z-10 drop-shadow-[0_0_15px_rgba(255,49,49,0.9)]"
               referrerPolicy="no-referrer"
