@@ -63,6 +63,10 @@ export default function App() {
   const audioChunksRef = useRef<Blob[]>([]);
   const audioCtxRef = useRef<AudioContext | null>(null);
 
+  const startMediaRecorderRef = useRef<() => Promise<void>>(null);
+
+  const fallingBackRef = useRef(false);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -83,12 +87,24 @@ export default function App() {
 
         recognition.onerror = (event: any) => {
           console.error('Speech recognition error:', event.error);
-          setIsListening(false);
-          setStatusText('VOICE ERROR');
+          
+          if (event.error === 'network') {
+            setStatusText('NETWORK ERROR - FALLING BACK');
+            fallingBackRef.current = true;
+            if (startMediaRecorderRef.current) {
+              startMediaRecorderRef.current();
+            }
+          } else {
+            setIsListening(false);
+            setStatusText('VOICE ERROR');
+          }
         };
 
         recognition.onend = () => {
-          setIsListening(false);
+          if (!fallingBackRef.current) {
+            setIsListening(false);
+          }
+          fallingBackRef.current = false;
         };
 
         recognitionRef.current = recognition;
@@ -110,7 +126,17 @@ export default function App() {
           sampleRate: 44100
         } 
       });
-      const mediaRecorder = new MediaRecorder(stream);
+      
+      const getSupportedMimeType = () => {
+        const types = ['audio/webm', 'audio/ogg', 'audio/mp4', 'audio/wav'];
+        for (const type of types) {
+          if (MediaRecorder.isTypeSupported(type)) return type;
+        }
+        return '';
+      };
+
+      const mimeType = getSupportedMimeType();
+      const mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
       mediaRecorderRef.current = mediaRecorder;
       audioChunksRef.current = [];
 
@@ -159,7 +185,8 @@ export default function App() {
 
       mediaRecorder.onstop = async () => {
         setIsListening(false);
-        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const actualMimeType = mediaRecorder.mimeType || 'audio/webm';
+        const audioBlob = new Blob(audioChunksRef.current, { type: actualMimeType });
         setStatusText('TRANSCRIBING...');
         
         try {
@@ -167,7 +194,7 @@ export default function App() {
           reader.readAsDataURL(audioBlob);
           reader.onloadend = async () => {
             const base64Audio = (reader.result as string).split(',')[1];
-            const transcript = await transcribeAudio(base64Audio, 'audio/webm');
+            const transcript = await transcribeAudio(base64Audio, actualMimeType);
             if (transcript) {
               setInput(transcript);
               setStatusText('VOICE CAPTURED');
@@ -198,33 +225,44 @@ export default function App() {
     }
   };
 
+  // Assign the ref so the useEffect can access it
+  (startMediaRecorderRef as any).current = startMediaRecorder;
+
   const toggleListening = () => {
     if (isGenerating) {
       setStatusText('SYSTEM BUSY...');
       return;
     }
+
+    if (isListening) {
+      // Stop whatever is active
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
+        mediaRecorderRef.current.stop();
+      } else if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch (e) {
+          console.warn('Failed to stop recognition:', e);
+        }
+      }
+      setIsListening(false);
+      return;
+    }
+
+    // Start listening
     // Prefer native SpeechRecognition if available
     if (recognitionRef.current) {
-      if (isListening) {
-        recognitionRef.current.stop();
-      } else {
-        try {
-          recognitionRef.current.start();
-          setIsListening(true);
-          setStatusText('LISTENING...');
-        } catch (e) {
-          // Fallback to MediaRecorder if recognition fails to start
-          startMediaRecorder();
-        }
+      try {
+        recognitionRef.current.start();
+        setIsListening(true);
+        setStatusText('LISTENING...');
+      } catch (e) {
+        // Fallback to MediaRecorder if recognition fails to start
+        startMediaRecorder();
       }
     } else {
       // Fallback to MediaRecorder + Gemini Transcription
-      if (isListening) {
-        mediaRecorderRef.current?.stop();
-        setIsListening(false);
-      } else {
-        startMediaRecorder();
-      }
+      startMediaRecorder();
     }
   };
 
