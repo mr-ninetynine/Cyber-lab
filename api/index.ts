@@ -286,8 +286,15 @@ async function startServer() {
     });
   } else {
     // Production static serving
-    const distPath = path.join(process.cwd(), "dist");
+    const distPath = path.resolve(__dirname, "..", "dist");
     app.use(express.static(distPath));
+    
+    // Fallback for logo.png specifically
+    app.get("/logo.png", (req, res) => {
+      const publicLogo = path.resolve(__dirname, "..", "public", "logo.png");
+      res.sendFile(publicLogo);
+    });
+
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));
     });
