@@ -51,17 +51,19 @@ async function startServer() {
   function getAI() {
     const geminiKey = process.env.GEMINI_API_KEY;
     const apiKey = process.env.API_KEY;
+    const lKey = process.env.L_key;
     
-    let keyToUse = geminiKey || apiKey;
-    const source = geminiKey ? "GEMINI_API_KEY" : (apiKey ? "API_KEY" : "NONE");
+    let keyToUse = geminiKey || apiKey || lKey;
+    const source = geminiKey ? "GEMINI_API_KEY" : (apiKey ? "API_KEY" : (lKey ? "L_key (System Fallback)" : "NONE"));
     
     if (keyToUse) {
       // Clean the key: remove quotes, non-printable characters, and trim
       keyToUse = keyToUse.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
       
       const isPlaceholder = keyToUse.includes("TODO") || keyToUse.includes("YOUR_API_KEY") || keyToUse.length < 10;
+      const isExpiredFallback = !geminiKey && !apiKey && !!lKey;
       
-      console.log(`[getAI] Source: ${source}, Length: ${keyToUse.length}, Masked: ${keyToUse.substring(0, 4)}...${keyToUse.substring(keyToUse.length - 4)}, Placeholder: ${isPlaceholder}`);
+      console.log(`[getAI] Source: ${source}, Length: ${keyToUse.length}, Masked: ${keyToUse.substring(0, 4)}...${keyToUse.substring(keyToUse.length - 4)}, Placeholder: ${isPlaceholder}, ExpiredFallback: ${isExpiredFallback}`);
       
       if (isPlaceholder) {
         console.warn(`[getAI] API key from ${source} appears to be a placeholder or invalid.`);
@@ -71,7 +73,7 @@ async function startServer() {
       return new GoogleGenAI({ apiKey: keyToUse });
     }
     
-    console.warn("[getAI] No API key found in GEMINI_API_KEY or API_KEY environment variables.");
+    console.warn("[getAI] No API key found in GEMINI_API_KEY, API_KEY, or L_key.");
     return null;
   }
 
@@ -79,9 +81,10 @@ async function startServer() {
   app.get("/api/health", (req, res) => {
     const geminiKey = process.env.GEMINI_API_KEY;
     const apiKey = process.env.API_KEY;
+    const lKey = process.env.L_key;
     
-    let keyToUse = geminiKey || apiKey;
-    const source = geminiKey ? "GEMINI_API_KEY" : (apiKey ? "API_KEY" : "NONE");
+    let keyToUse = geminiKey || apiKey || lKey;
+    const source = geminiKey ? "GEMINI_API_KEY" : (apiKey ? "API_KEY" : (lKey ? "L_key" : "NONE"));
     
     let diagnostic = {
       status: "ok",
@@ -89,7 +92,8 @@ async function startServer() {
       isKeyConfigured: false,
       source: source,
       keyLength: 0,
-      maskedKey: "none"
+      maskedKey: "none",
+      isExpiredFallback: !geminiKey && !apiKey && !!lKey
     };
 
     if (keyToUse) {

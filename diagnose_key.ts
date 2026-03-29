@@ -7,21 +7,14 @@ dotenv.config();
 async function diagnose() {
   const geminiKey = process.env.GEMINI_API_KEY;
   const apiKey = process.env.API_KEY;
+  const lKey = process.env.L_key;
   
   console.log("--- API Key Diagnosis ---");
   console.log("GEMINI_API_KEY found:", !!geminiKey);
-  if (geminiKey) {
-    console.log("GEMINI_API_KEY length:", geminiKey.length);
-    console.log("GEMINI_API_KEY masked:", geminiKey.substring(0, 4) + "..." + geminiKey.substring(geminiKey.length - 4));
-  }
-  
   console.log("API_KEY found:", !!apiKey);
-  if (apiKey) {
-    console.log("API_KEY length:", apiKey.length);
-    console.log("API_KEY masked:", apiKey.substring(0, 4) + "..." + apiKey.substring(apiKey.length - 4));
-  }
+  console.log("L_key found:", !!lKey);
   
-  const keyToUse = geminiKey || apiKey;
+  const keyToUse = geminiKey || apiKey || lKey;
   if (!keyToUse) {
     console.log("RESULT: No API key found in environment variables.");
     return;
