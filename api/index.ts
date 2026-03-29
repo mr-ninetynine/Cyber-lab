@@ -30,6 +30,18 @@ Output Format:
 - Ensure the text is still readable for Text-to-Speech, but prioritize technical accuracy and the requested formatting (Markdown/Tables).`;
 
 async function startServer() {
+  const isProd = process.env.NODE_ENV === "production";
+  
+  // Load local .env only in development
+  if (!isProd) {
+    try {
+      const dotenv = await import("dotenv");
+      dotenv.config();
+    } catch (e) {
+      console.warn("dotenv not found, skipping local env loading");
+    }
+  }
+
   const app = express();
   const PORT = 3000;
 
@@ -163,7 +175,6 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  const isProd = process.env.NODE_ENV === "production";
   if (!isProd) {
     const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
