@@ -1,11 +1,7 @@
 import express from "express";
-import { createServer as createViteServer } from "vite";
 import path from "path";
 import { fileURLToPath } from "url";
 import { GoogleGenAI, Modality, ThinkingLevel } from "@google/genai";
-import dotenv from "dotenv";
-
-dotenv.config();
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,7 +33,7 @@ async function startServer() {
   const app = express();
   const PORT = 3000;
 
-  app.use(express.json({ limit: '50mb' }));
+  app.use(express.json({ limit: '5mb' })); // Reduced limit for Vercel compatibility
 
   const apiKey = process.env.GEMINI_API_KEY;
   const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
@@ -169,6 +165,7 @@ async function startServer() {
   // Vite middleware for development
   const isProd = process.env.NODE_ENV === "production";
   if (!isProd) {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
