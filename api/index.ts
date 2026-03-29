@@ -290,8 +290,8 @@ async function startServer() {
     app.use(express.static(distPath));
     
     // Fallback for logo.png specifically
-    app.get("/public/logo.png", (req, res) => {
-      const publicLogo = path.resolve(__dirname, "..", "public", "logo.png");
+    app.get("/public/team.png", (req, res) => {
+      const publicLogo = path.resolve(__dirname, "..", "public", "team.png");
       res.sendFile(publicLogo);
     });
 
