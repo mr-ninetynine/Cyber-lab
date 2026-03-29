@@ -58,9 +58,11 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
       let errorMessage = "Uplink failure";
       try {
         const errorData = JSON.parse(text);
-        errorMessage = errorData.error || errorMessage;
+        errorMessage = typeof errorData.error === 'object' 
+          ? JSON.stringify(errorData.error) 
+          : (errorData.error || errorMessage);
       } catch (e) {
-        errorMessage = `Server Error (${response.status}): ${text.slice(0, 100)}...`;
+        errorMessage = `Server Error (${response.status}): ${text.slice(0, 500)}...`;
       }
       throw new Error(errorMessage);
     }
@@ -111,9 +113,11 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
       let errorMessage = "Transcription failure";
       try {
         const errorData = JSON.parse(text);
-        errorMessage = errorData.error || errorMessage;
+        errorMessage = typeof errorData.error === 'object' 
+          ? JSON.stringify(errorData.error) 
+          : (errorData.error || errorMessage);
       } catch (e) {
-        errorMessage = `Server Error (${response.status}): ${text.slice(0, 100)}...`;
+        errorMessage = `Server Error (${response.status}): ${text.slice(0, 500)}...`;
       }
       throw new Error(errorMessage);
     }
@@ -139,9 +143,11 @@ export async function generateSpeech(text: string): Promise<string> {
       let errorMessage = "TTS failure";
       try {
         const errorData = JSON.parse(text);
-        errorMessage = errorData.error || errorMessage;
+        errorMessage = typeof errorData.error === 'object' 
+          ? JSON.stringify(errorData.error) 
+          : (errorData.error || errorMessage);
       } catch (e) {
-        errorMessage = `Server Error (${response.status}): ${text.slice(0, 100)}...`;
+        errorMessage = `Server Error (${response.status}): ${text.slice(0, 500)}...`;
       }
       throw new Error(errorMessage);
     }

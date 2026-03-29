@@ -32,21 +32,16 @@ Output Format:
 async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
   
-  const platformKey = process.env.GEMINI_API_KEY;
-  if (platformKey) {
-    console.log(`Platform GEMINI_API_KEY detected (starts with: ${platformKey.substring(0, 6)}...)`);
-  }
-
   // Load local .env only in development
   if (!isProd) {
     try {
       const dotenv = await import("dotenv");
-      // Use override: false to avoid breaking working platform keys with invalid local ones
-      const result = dotenv.config({ override: false });
+      // Use override: true to allow local .env to take precedence for debugging
+      const result = dotenv.config({ override: true });
       if (result.error) {
         console.warn("dotenv found but failed to load:", result.error);
       } else {
-        console.log("Environment variables loaded from .env (no override)");
+        console.log("Environment variables loaded from .env (with override)");
       }
     } catch (e) {
       console.warn("dotenv not found, skipping local env loading");
@@ -60,8 +55,11 @@ async function startServer() {
 
   let apiKey = process.env.GEMINI_API_KEY;
   if (apiKey) {
-    apiKey = apiKey.trim();
-    console.log(`Final GEMINI_API_KEY in use (starts with: ${apiKey.substring(0, 6)}...)`);
+    console.log(`Original GEMINI_API_KEY length: ${apiKey.length}`);
+    // Clean the key: remove quotes, non-printable characters, and trim
+    apiKey = apiKey.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
+    console.log(`Final GEMINI_API_KEY length: ${apiKey.length}`);
+    console.log(`Final GEMINI_API_KEY in use (starts with: ${apiKey.substring(0, 10)}...)`);
   } else {
     console.warn("GEMINI_API_KEY is NOT defined in the environment.");
   }
@@ -92,14 +90,13 @@ async function startServer() {
         });
       }
 
-      // Using gemini-3-flash-preview as it's more widely available and robust for general tasks
+      // Using gemini-3.1-flash-lite-preview as a fallback
       const response = await ai.models.generateContentStream({
-        model: "gemini-3-flash-preview",
+        model: "gemini-3.1-flash-lite-preview",
         contents: [{ role: "user", parts }],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           maxOutputTokens: 4096,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
         },
       });
 
