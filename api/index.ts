@@ -32,11 +32,22 @@ Output Format:
 async function startServer() {
   const isProd = process.env.NODE_ENV === "production";
   
+  const platformKey = process.env.GEMINI_API_KEY;
+  if (platformKey) {
+    console.log(`Platform GEMINI_API_KEY detected (starts with: ${platformKey.substring(0, 6)}...)`);
+  }
+
   // Load local .env only in development
   if (!isProd) {
     try {
       const dotenv = await import("dotenv");
-      dotenv.config();
+      // Use override: false to avoid breaking working platform keys with invalid local ones
+      const result = dotenv.config({ override: false });
+      if (result.error) {
+        console.warn("dotenv found but failed to load:", result.error);
+      } else {
+        console.log("Environment variables loaded from .env (no override)");
+      }
     } catch (e) {
       console.warn("dotenv not found, skipping local env loading");
     }
@@ -47,7 +58,13 @@ async function startServer() {
 
   app.use(express.json({ limit: '5mb' })); // Reduced limit for Vercel compatibility
 
-  const apiKey = process.env.GEMINI_API_KEY;
+  let apiKey = process.env.GEMINI_API_KEY;
+  if (apiKey) {
+    apiKey = apiKey.trim();
+    console.log(`Final GEMINI_API_KEY in use (starts with: ${apiKey.substring(0, 6)}...)`);
+  } else {
+    console.warn("GEMINI_API_KEY is NOT defined in the environment.");
+  }
   const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
   // Health check
@@ -75,13 +92,14 @@ async function startServer() {
         });
       }
 
+      // Using gemini-3-flash-preview as it's more widely available and robust for general tasks
       const response = await ai.models.generateContentStream({
-        model: "gemini-3.1-pro-preview",
+        model: "gemini-3-flash-preview",
         contents: [{ role: "user", parts }],
         config: {
           systemInstruction: SYSTEM_INSTRUCTION,
           maxOutputTokens: 4096,
-          thinkingConfig: { thinkingLevel: ThinkingLevel.HIGH }
+          thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
         },
       });
 
