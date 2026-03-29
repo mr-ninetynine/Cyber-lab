@@ -42,6 +42,11 @@ async function startServer() {
   const apiKey = process.env.GEMINI_API_KEY;
   const ai = apiKey ? new GoogleGenAI({ apiKey }) : null;
 
+  // Health check
+  app.get("/api/health", (req, res) => {
+    res.json({ status: "ok", mode: process.env.NODE_ENV || "development" });
+  });
+
   // API Routes
   app.post("/api/gemini/chat", async (req, res) => {
     if (!ai) return res.status(500).json({ error: "GEMINI_API_KEY is not defined" });
@@ -162,7 +167,8 @@ async function startServer() {
   });
 
   // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
+  const isProd = process.env.NODE_ENV === "production";
+  if (!isProd) {
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -172,7 +178,12 @@ async function startServer() {
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      const indexPath = path.join(distPath, 'index.html');
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          res.status(404).send("The page could not be found. Ensure the app is built correctly.");
+        }
+      });
     });
   }
 

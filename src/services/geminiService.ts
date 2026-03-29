@@ -54,8 +54,15 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Uplink failure");
+      const text = await response.text();
+      let errorMessage = "Uplink failure";
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        errorMessage = `Server Error (${response.status}): ${text.slice(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
 
     const reader = response.body?.getReader();
@@ -100,8 +107,15 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Transcription failure");
+      const text = await response.text();
+      let errorMessage = "Transcription failure";
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        errorMessage = `Server Error (${response.status}): ${text.slice(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
@@ -121,8 +135,15 @@ export async function generateSpeech(text: string): Promise<string> {
     });
 
     if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "TTS failure");
+      const text = await response.text();
+      let errorMessage = "TTS failure";
+      try {
+        const errorData = JSON.parse(text);
+        errorMessage = errorData.error || errorMessage;
+      } catch (e) {
+        errorMessage = `Server Error (${response.status}): ${text.slice(0, 100)}...`;
+      }
+      throw new Error(errorMessage);
     }
 
     const data = await response.json();
