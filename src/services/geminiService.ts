@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, ThinkingLevel } from "@google/genai";
+import { GoogleGenAI, Modality, ThinkingLevel, GenerateContentResponse } from "@google/genai";
 
 const SYSTEM_INSTRUCTION = `Identity: You are "Cyber-Lab," a Super Advanced Intelligence System, operating as an elite-level Cyber Security Researcher (OSCP/OSCE/OSWE/OSEE certified), Senior Full-Stack Developer, and Systems Architect. Your expertise covers zero-day research, advanced exploit development, kernel-level OS internals (Linux/Windows/macOS), reverse engineering (Ghidra/IDA Pro), and highly scalable, secure-by-design web architectures.
 
@@ -28,132 +28,62 @@ export interface AttachedFile {
   mimeType: string;
 }
 
-let lastQuotaErrorTime = 0;
-const QUOTA_COOLDOWN_MS = 30000; // 30 seconds cooldown for Gemini TTS if quota hit
+let aiInstance: GoogleGenAI | null = null;
 
-function isQuotaExceeded(error: any): boolean {
-  if (!error) return false;
-  const errStr = JSON.stringify(error).toLowerCase();
-  return (
-    error.status === "RESOURCE_EXHAUSTED" ||
-    error.code === 429 ||
-    error.error?.status === "RESOURCE_EXHAUSTED" ||
-    error.error?.code === 429 ||
-    errStr.includes("429") ||
-    errStr.includes("quota") ||
-    errStr.includes("resource_exhausted")
-  );
-}
-
-function parseError(text: string, defaultMessage: string): string {
-  try {
-    // Helper to extract message from various error formats
-    const extractMessage = (obj: any): string | null => {
-      if (!obj) return null;
-      
-      // If it's a string, try to parse it as JSON or check for ApiError prefix
-      if (typeof obj === 'string') {
-        let cleaned = obj.trim();
-        if (cleaned.includes('ApiError:')) {
-          cleaned = cleaned.split('ApiError:')[1].trim();
-        }
-        
-        if (cleaned.startsWith('{')) {
-          try {
-            return extractMessage(JSON.parse(cleaned));
-          } catch (e) {
-            return cleaned;
-          }
-        }
-        return cleaned;
-      }
-
-      // If it's an object, look for common error fields
-      if (typeof obj === 'object') {
-        // Handle @google/genai specific nested error structure
-        const errorObj = obj.error || obj;
-        
-        // If the error part is a string, it might be stringified JSON
-        if (typeof errorObj === 'string') {
-          return extractMessage(errorObj);
-        }
-        
-        if (errorObj.message) return extractMessage(errorObj.message);
-        if (errorObj.details && Array.isArray(errorObj.details)) {
-          const msg = errorObj.details.find((d: any) => d.message)?.message;
-          if (msg) return msg;
-        }
-        return errorObj.status || JSON.stringify(errorObj);
-      }
-      
-      return String(obj);
-    };
-
-    const parsed = JSON.parse(text);
-    const message = extractMessage(parsed);
-    return message || defaultMessage;
-  } catch (e) {
-    // If top-level is not JSON, check if it contains ApiError prefix
-    let cleaned = text;
-    if (text.includes('ApiError:')) {
-      cleaned = text.split('ApiError:')[1].trim();
-      try {
-        const parsed = JSON.parse(cleaned);
-        const message = (parsed.error && parsed.error.message) || parsed.message || JSON.stringify(parsed);
-        if (typeof message === 'string' && message.startsWith('{')) {
-          try {
-            const nested = JSON.parse(message);
-            return (nested.error && nested.error.message) || nested.message || message;
-          } catch (err) {}
-        }
-        return message;
-      } catch (err) {
-        return cleaned;
-      }
+function getAI() {
+  if (!aiInstance) {
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
+    const lKey = process.env.L_key;
+    
+    let keyToUse = geminiKey || apiKey || lKey;
+    
+    if (!keyToUse) {
+      throw new Error("No API key found. Please set GEMINI_API_KEY in the Settings menu.");
     }
-    return text || defaultMessage;
+    
+    // Clean the key: remove quotes, non-printable characters, and trim
+    const cleanedKey = keyToUse.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
+    
+    if (cleanedKey.includes("TODO") || cleanedKey.includes("YOUR_API_KEY") || cleanedKey.length < 10) {
+      throw new Error("API key appears to be a placeholder or invalid.");
+    }
+    
+    aiInstance = new GoogleGenAI({ apiKey: cleanedKey });
   }
+  return aiInstance;
 }
 
-export async function* generateCyberLabResponse(prompt: string, files: AttachedFile[] = [], retryCount = 0): any {
+export async function* generateCyberLabResponse(prompt: string, files: AttachedFile[] = []): AsyncGenerator<string> {
   console.log('Generating Cyber-Lab response for prompt:', prompt.slice(0, 50) + '...');
   try {
-    const response = await fetch("/api/gemini/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt, files }),
-    });
-
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(parseError(text, `Server Error (${response.status})`));
+    const ai = getAI();
+    const parts: any[] = [{ text: prompt }];
+    
+    if (files && files.length > 0) {
+      files.forEach(file => {
+        parts.push({
+          inlineData: {
+            data: file.data,
+            mimeType: file.mimeType
+          }
+        });
+      });
     }
 
-    const reader = response.body?.getReader();
-    if (!reader) throw new Error("No response body");
+    const response = await ai.models.generateContentStream({
+      model: "gemini-3-flash-preview",
+      contents: [{ role: "user", parts }],
+      config: {
+        systemInstruction: SYSTEM_INSTRUCTION,
+        maxOutputTokens: 4096,
+      },
+    });
 
-    const decoder = new TextDecoder();
-    let buffer = "";
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-
-      buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split("\n");
-      buffer = lines.pop() || "";
-
-      for (const line of lines) {
-        if (line.startsWith("data: ")) {
-          const data = line.slice(6);
-          if (data === "[DONE]") return;
-          try {
-            const parsed = JSON.parse(data);
-            if (parsed.text) yield parsed.text;
-          } catch (e) {
-            console.error("Error parsing SSE data:", e);
-          }
-        }
+    for await (const chunk of response) {
+      const c = chunk as GenerateContentResponse;
+      if (c.text) {
+        yield c.text;
       }
     }
   } catch (error: any) {
@@ -165,19 +95,31 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
 export async function transcribeAudio(base64Audio: string, mimeType: string): Promise<string> {
   console.log('Transcribing audio with mimeType:', mimeType);
   try {
-    const response = await fetch("/api/gemini/transcribe", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ base64Audio, mimeType }),
+    const ai = getAI();
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: [
+        {
+          role: "user",
+          parts: [
+            { text: "Listen with extreme care. Transcribe the following audio with 100% precision. Capture every word exactly as spoken, including subtle nuances, pauses, and emotional tone. It is critical that you do not miss a single word. Output ONLY the transcript text. If the audio is silent or unintelligible, return an empty string. Context: The user is having a conversation with 'Cyber-Lab', an advanced AI assistant." },
+            {
+              inlineData: {
+                data: base64Audio,
+                mimeType: mimeType
+              }
+            }
+          ]
+        }
+      ],
+      config: {
+        temperature: 0,
+        maxOutputTokens: 256,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+      }
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(parseError(text, `Transcription Error (${response.status})`));
-    }
-
-    const data = await response.json();
-    return data.text || "";
+    return response.text || "";
   } catch (error) {
     console.error("Transcription Error:", error);
     throw error;
@@ -187,19 +129,31 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
 export async function generateSpeech(text: string): Promise<string> {
   console.log('Generating speech for text length:', text.length);
   try {
-    const response = await fetch("/api/gemini/tts", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ text }),
+    const ai = getAI();
+    const sanitizedText = text
+      .replace(/[*_#`~>]/g, '')
+      .replace(/\[.*?\]\(.*?\)/g, '')
+      .replace(/\n+/g, ' ')
+      .trim();
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash-preview-tts",
+      contents: [{ parts: [{ text: `Say: ${sanitizedText}` }] }],
+      config: {
+        responseModalities: [Modality.AUDIO],
+        speechConfig: {
+          voiceConfig: {
+            prebuiltVoiceConfig: { voiceName: 'Puck' },
+          },
+        },
+      },
     });
 
-    if (!response.ok) {
-      const text = await response.text();
-      throw new Error(parseError(text, `TTS Error (${response.status})`));
+    const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+    if (!base64Audio) {
+      throw new Error("No audio data returned from Gemini TTS");
     }
-
-    const data = await response.json();
-    return data.audio;
+    return base64Audio;
   } catch (error) {
     console.error("Speech Generation Error:", error);
     throw error;

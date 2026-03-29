@@ -478,22 +478,25 @@ function CyberLabApp() {
   }, [messages]);
 
   useEffect(() => {
-    const checkKeyStatus = async () => {
-      try {
-        const response = await fetch('/api/health');
-        if (response.ok) {
-          const data = await response.json();
-          setApiDiagnostic(data);
-          if (data.isExpiredFallback) {
-            setApiError(`API_KEY_EXPIRED: The system fallback key (L_key) is EXPIRED. Please set GEMINI_API_KEY in Settings.`);
-          } else if (!data.isKeyConfigured) {
-            setApiError(`API_KEY_ERROR: No valid key found in ${data.source}. (Length: ${data.keyLength})`);
-          } else {
-            setApiError(null);
-          }
-        }
-      } catch (e) {
-        console.warn('Failed to check API key status:', e);
+    const checkKeyStatus = () => {
+      const geminiKey = process.env.GEMINI_API_KEY;
+      const apiKey = process.env.API_KEY;
+      const lKey = process.env.L_key;
+      
+      let keyToUse = geminiKey || apiKey || lKey;
+      
+      if (!keyToUse) {
+        setApiError("API_KEY_ERROR: No API key found. Please set GEMINI_API_KEY in the Settings menu.");
+        return;
+      }
+      
+      const cleanedKey = keyToUse.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
+      const isPlaceholder = cleanedKey.includes("TODO") || cleanedKey.includes("YOUR_API_KEY") || cleanedKey.length < 10;
+      
+      if (isPlaceholder) {
+        setApiError("API_KEY_ERROR: Your API key appears to be a placeholder or invalid.");
+      } else {
+        setApiError(null);
       }
     };
     checkKeyStatus();
@@ -501,26 +504,26 @@ function CyberLabApp() {
 
   const handleReverify = async () => {
     setStatusText('RE-VERIFYING UPLINK...');
-    try {
-      const response = await fetch('/api/health');
-      if (response.ok) {
-        const data = await response.json();
-        setApiDiagnostic(data);
-        if (data.isKeyConfigured && !data.isExpiredFallback) {
-          setApiError(null);
-          setStatusText('UPLINK RESTORED');
-          setTimeout(() => setStatusText('SYSTEM IDLE'), 2000);
-        } else if (data.isExpiredFallback) {
-          setApiError(`API_KEY_EXPIRED: Still using expired system key. Please set GEMINI_API_KEY in Settings.`);
-          setStatusText('UPLINK FAILED');
-        } else {
-          setApiError(`API_KEY_ERROR: Key in ${data.source} is still invalid. (Length: ${data.keyLength})`);
-          setStatusText('UPLINK FAILED');
-        }
+    const geminiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.API_KEY;
+    const lKey = process.env.L_key;
+    
+    let keyToUse = geminiKey || apiKey || lKey;
+    
+    if (keyToUse) {
+      const cleanedKey = keyToUse.replace(/^["']|["']$/g, '').replace(/[^\x20-\x7E]/g, '').trim();
+      const isPlaceholder = cleanedKey.includes("TODO") || cleanedKey.includes("YOUR_API_KEY") || cleanedKey.length < 10;
+      
+      if (!isPlaceholder) {
+        setApiError(null);
+        setStatusText('UPLINK RESTORED');
+        setTimeout(() => setStatusText('SYSTEM IDLE'), 2000);
+        return;
       }
-    } catch (e) {
-      setStatusText('CONNECTION ERROR');
     }
+    
+    setApiError("API_KEY_ERROR: API key is still invalid or missing.");
+    setStatusText('UPLINK FAILED');
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
