@@ -1,6 +1,5 @@
 import { useState, useRef, useEffect, Component, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import logoteam from './assets/logoteam.png';
 import { 
   Terminal as TerminalIcon, 
   Zap, 
@@ -640,14 +639,14 @@ function CyberLabApp() {
       {/* Background Watermark */}
       <div 
         className="absolute inset-0 z-0 opacity-10 pointer-events-none bg-center bg-no-repeat"
-        style={{ backgroundImage: `url(${logoteam})`, backgroundSize: '30%' }}
+        style={{ backgroundImage: `url('/team.png')`, backgroundSize: '30%' }}
       />
       {/* Header */}
       <header className="border-b border-aegis-red/30 p-4 flex items-center justify-between bg-black/40 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <div className="relative">
             <img 
-              src={logoteam} 
+              src="/logo.png" 
               alt="Devil Hunter Cyber Corps" 
               className="w-16 h-16 object-contain relative z-10 drop-shadow-[0_0_15px_rgba(255,49,49,0.9)]"
               referrerPolicy="no-referrer"
