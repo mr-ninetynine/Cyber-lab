@@ -657,7 +657,7 @@ function CyberLabApp() {
                 scale: [1, 1.1, 1]
               }}
               transition={{ duration: 3, repeat: Infinity }}
-              className="absolute inset-0 bg-aegis-red/40 blur-xl rounded-full -z-0"
+              className="absolute inset-0 bg-aegis-red/40 blur-xl rounded-full -z-10"
             />
           </div>
           <h1 className="text-2xl font-bold tracking-[0.2em] matrix-text">Cyber-LAB</h1>
