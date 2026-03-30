@@ -639,7 +639,7 @@ function CyberLabApp() {
       {/* Background Watermark */}
       <div 
         className="absolute inset-0 z-0 opacity-10 pointer-events-none bg-center bg-no-repeat"
-        style={{ backgroundImage: "url('/logoteam.png')", backgroundSize: '30%' }}
+        style={{ backgroundImage: "url('/at.png')", backgroundSize: '30%' }}
       />
       {/* Header */}
       <header className="border-b border-aegis-red/30 p-4 flex items-center justify-between bg-black/40 backdrop-blur-sm sticky top-0 z-10">

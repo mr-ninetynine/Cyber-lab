@@ -5,9 +5,6 @@
       "source": "/api/(.*)",
       "destination": "/api/index.ts"
     },
-    { "source": "/logo.png", "destination": "/logo.png" },
-    { "source": "/logoteam.png", "destination": "/logoteam.png" },
-    { "source": "/team.png", "destination": "/team.png" },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"
