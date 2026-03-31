@@ -642,7 +642,7 @@ function CyberLabApp() {
         style={{ backgroundImage: "url('https://i.ibb.co.com/jvQPkL2Y/at.png')", backgroundSize: '30%' }}
       />
       {/* Header */}
-      <header className="border-b border-aegis-red/30 p-4 flex items-center justify-between bg-black/40 backdrop-blur-sm sticky top-0 z-10">
+      <header className="border-b border-aegis-red/30 p-4 flex flex-wrap items-center justify-between gap-4 bg-black/40 backdrop-blur-sm sticky top-0 z-10">
         <div className="flex items-center gap-4">
           <div className="relative">
             <img 
@@ -730,7 +730,7 @@ function CyberLabApp() {
         
         {/* Status Tracker */}
         <div className="bg-black/40 border border-aegis-red/20 rounded-lg p-3 flex flex-col gap-2">
-          <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-aegis-red/80">
+          <div className="flex flex-wrap justify-between items-center text-[10px] uppercase tracking-widest text-aegis-red/80 gap-y-2">
             <div className="flex items-center gap-2">
               <Activity size={12} className="animate-pulse" />
               <span>{statusText}</span>
