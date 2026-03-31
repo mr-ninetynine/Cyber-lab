@@ -401,9 +401,12 @@ function CyberLabApp() {
         
         setStatusText('SPEAKING...');
         
-        const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+        let audioCtx = audioCtxRef.current;
+        if (!audioCtx) {
+          audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+          audioCtxRef.current = audioCtx;
+        }
         if (audioCtx.state === 'suspended') await audioCtx.resume();
-        audioCtxRef.current = audioCtx;
         
         const binaryString = atob(base64Audio);
         const len = binaryString.length;

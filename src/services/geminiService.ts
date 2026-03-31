@@ -72,11 +72,12 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
     }
 
     const response = await ai.models.generateContentStream({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.1-flash-lite-preview",
       contents: [{ role: "user", parts }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         maxOutputTokens: 4096,
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
       },
     });
 
@@ -115,7 +116,7 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
       config: {
         temperature: 0,
         maxOutputTokens: 256,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.LOW }
+        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
       }
     });
 
