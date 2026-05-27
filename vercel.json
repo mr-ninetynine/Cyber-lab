@@ -1,13 +1,11 @@
 {
   "version": 2,
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/index.ts"
+  "functions": {
+    "api/**/*.ts": {
+      "runtime": "edge"
     },
-    {
-      "source": "/((?!api/).*)",
-      "destination": "/index.html"
+    "api/**/*.js": {
+      "runtime": "edge"
     }
-  ]
+  }
 }
