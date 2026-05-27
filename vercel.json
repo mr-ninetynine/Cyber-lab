@@ -1,11 +1,13 @@
 {
   "version": 2,
-  "functions": {
-    "api/**/*.ts": {
-      "runtime": "edge"
+  "builds": [
+    {
+      "src": "api/**/*.ts",
+      "use": "@vercel/node"
     },
-    "api/**/*.js": {
-      "runtime": "edge"
+    {
+      "src": "package.json",
+      "use": "@vercel/static"
     }
-  }
+  ]
 }
