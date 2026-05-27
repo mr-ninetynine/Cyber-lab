@@ -1,4 +1,4 @@
-import { GoogleGenAI, Modality, ThinkingLevel, GenerateContentResponse } from "@google/genai";
+import { GoogleGenAI, Modality, GenerateContentResponse } from "@google/genai";
 
 const SYSTEM_INSTRUCTION = `Identity: You are "Cyber-Lab," a Super Advanced Intelligence System, operating as an elite-level Cyber Security Researcher (OSCP/OSCE/OSWE/OSEE certified), Senior Full-Stack Developer, and Systems Architect. Your expertise covers zero-day research, advanced exploit development, kernel-level OS internals (Linux/Windows/macOS), reverse engineering (Ghidra/IDA Pro), and highly scalable, secure-by-design web architectures.
 
@@ -72,12 +72,11 @@ export async function* generateCyberLabResponse(prompt: string, files: AttachedF
     }
 
     const response = await ai.models.generateContentStream({
-      model: "gemini-3.1-flash-lite-preview",
+      model: "gemini-3.5-flash",
       contents: [{ role: "user", parts }],
       config: {
         systemInstruction: SYSTEM_INSTRUCTION,
         maxOutputTokens: 4096,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
       },
     });
 
@@ -98,7 +97,7 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
   try {
     const ai = getAI();
     const response = await ai.models.generateContent({
-      model: "gemini-3-flash-preview",
+      model: "gemini-3.5-flash",
       contents: [
         {
           role: "user",
@@ -116,7 +115,6 @@ export async function transcribeAudio(base64Audio: string, mimeType: string): Pr
       config: {
         temperature: 0,
         maxOutputTokens: 256,
-        thinkingConfig: { thinkingLevel: ThinkingLevel.MINIMAL }
       }
     });
 
@@ -138,7 +136,7 @@ export async function generateSpeech(text: string): Promise<string> {
       .trim();
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash-preview-tts",
+      model: "gemini-3.1-flash-tts-preview",
       contents: [{ parts: [{ text: `Say: ${sanitizedText}` }] }],
       config: {
         responseModalities: [Modality.AUDIO],

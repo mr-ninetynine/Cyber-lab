@@ -10,9 +10,9 @@ export default defineConfig(({mode}) => {
     build: {
       chunkSizeWarningLimit: 1000,
     },
-define: {
-  'process.env': env
-},
+    define: {
+      'process.env': env
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),
