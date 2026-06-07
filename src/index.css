@@ -1,13 +1,25 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Share+Tech+Mono&family=VT323&display=swap');
 @import "tailwindcss";
 
 @theme {
   --color-aegis-red: #FF3131;
+  --color-matrix-green: #00ff66;
+  --color-cyber-blue: #00f3ff;
+  --color-cyber-yellow: #ffb700;
   --color-pitch-black: #050505;
+  --font-heading: "Orbitron", sans-serif;
+  --font-mono: "Share Tech Mono", monospace;
+  --font-retro: "VT323", monospace;
 }
 
 @layer base {
   body {
-    @apply bg-pitch-black text-[#E0E0E0] font-mono;
+    @apply bg-pitch-black text-[#E0E0E0] font-mono select-none overflow-x-hidden;
+    background-image: 
+      radial-gradient(circle at 50% 50%, rgba(10, 10, 10, 0.8) 0%, rgba(5, 5, 5, 1) 100%),
+      linear-gradient(rgba(255, 49, 49, 0.05) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255, 49, 49, 0.05) 1px, transparent 1px);
+    background-size: 100% 100%, 30px 30px, 30px 30px;
   }
 }
 
@@ -40,30 +52,46 @@
   text-shadow: 0 0 5px rgba(255, 49, 49, 0.5);
 }
 
+/* CRT Screen Scanline Effects */
+.crt-container::before {
+  content: " ";
+  display: block;
+  position: absolute;
+  top: 0; left: 0; bottom: 0; right: 0;
+  background: linear-gradient(rgba(18, 16, 16, 0) 50%, rgba(0, 0, 0, 0.3) 50%), linear-gradient(90deg, rgba(255, 0, 0, 0.05), rgba(0, 255, 0, 0.02), rgba(0, 0, 255, 0.05));
+  z-index: 999;
+  background-size: 100% 4px, 6px 100%;
+  pointer-events: none;
+}
+
+.cyber-panel-border {
+  border-image: linear-gradient(to bottom, #FF3131, #00f3ff) 1;
+}
+
 .markdown-body pre {
-  @apply bg-black/50 border border-aegis-red/30 rounded p-4 my-4 overflow-x-auto;
+  @apply bg-black/60 border border-aegis-red/30 rounded p-4 my-4 overflow-x-auto font-mono text-xs text-cyber-blue shadow-[0_0_10px_rgba(0,243,255,0.1)];
 }
 
 .markdown-body code {
-  @apply text-aegis-red font-mono;
+  @apply text-cyber-blue font-mono;
 }
 
 .markdown-body h1, .markdown-body h2, .markdown-body h3 {
-  @apply text-aegis-red font-bold mt-6 mb-2;
+  @apply text-aegis-red font-bold mt-6 mb-2 font-heading tracking-wider;
 }
 
 .markdown-body p {
-  @apply mb-4 leading-relaxed;
+  @apply mb-4 leading-relaxed font-mono text-xs text-slate-300;
 }
 
 .markdown-body table {
-  @apply w-full border-collapse my-4;
+  @apply w-full border-collapse my-4 text-xs;
 }
 
 .markdown-body th, .markdown-body td {
-  @apply border border-aegis-red/30 p-2 text-left;
+  @apply border border-aegis-red/30 p-2 text-left font-mono;
 }
 
 .markdown-body th {
-  @apply bg-aegis-red/10 text-aegis-red;
+  @apply bg-aegis-red/10 text-aegis-red font-heading;
 }
