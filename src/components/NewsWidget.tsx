@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Globe, RefreshCw, AlertTriangle, ExternalLink, Shield, Radio, Flame, Server } from 'lucide-react';
+import { Globe, RefreshCw, AlertTriangle, ExternalLink, Shield, Radio, Flame, Server, Cpu, Layers } from 'lucide-react';
 
 interface NewsItem {
   id: string | number;
@@ -9,279 +9,376 @@ interface NewsItem {
   by?: string;
   time?: number;
   type: 'real' | 'cybernet';
-  category?: 'INTEL' | 'THREAT' | 'SYSTEM' | 'CORE';
+  category?: 'WORLD' | 'BUSINESS' | 'TECHNOLOGY' | 'ENTERTAINMENT' | 'SCIENCE' | 'THREAT' | 'SYSTEM' | 'CORE';
   severity?: 'LOW' | 'MED' | 'HIGH' | 'CRITICAL';
+  description?: string;
 }
 
-const CYBERNET_MOCK_ALERTS: NewsItem[] = [
+const FALLBACK_DECK_ALERTS: NewsItem[] = [
   {
     id: 'cyber-1',
-    title: 'MAINFRAME CORECTOMY: Kernel version x9 hot patch deployed globally to suppress neural entropy cascading.',
+    title: 'GEOPOLITICAL ENCRYPTION ROTATION: Allied forces synchronize tactical defense nodes across East Pacific quadrant.',
     type: 'cybernet',
-    category: 'SYSTEM',
+    category: 'WORLD',
     severity: 'LOW',
     time: Math.floor(Date.now() / 1000) - 300,
   },
   {
     id: 'cyber-2',
-    title: '[CRITICAL ALERT] Rogue subnetwork traffic detected in quadrant nine. Adaptive decryptors activated.',
+    title: '[POLITICAL RECON] Supreme committee approves fast-track neural quantum legislation amid civil compliance concerns.',
     type: 'cybernet',
-    category: 'THREAT',
-    severity: 'CRITICAL',
+    category: 'WORLD',
+    severity: 'MED',
     time: Math.floor(Date.now() / 1000) - 1200,
   },
   {
     id: 'cyber-3',
-    title: 'Cognitive payload injection successfully contained in lab testbed. Threat vector verified.',
+    title: 'WASM SYSTEM EXPLOIT: Core telemetry payload injected successfully. Dynamic countermeasures dispatched.',
     type: 'cybernet',
-    category: 'INTEL',
-    severity: 'MED',
-    time: Math.floor(Date.now() / 1000) - 3600,
+    category: 'TECHNOLOGY',
+    severity: 'CRITICAL',
+    time: Math.floor(Date.now() / 1000) - 2400,
   },
   {
     id: 'cyber-4',
-    title: 'Quantum alignment matrix rotated to baseline 42. Active scans indicate 100% telemetry accuracy.',
+    title: 'AI DEFENSE SECTOR: Automated sentinels expand perimeter patrols inside sovereign digital zones.',
     type: 'cybernet',
-    category: 'CORE',
+    category: 'THREAT',
     severity: 'HIGH',
-    time: Math.floor(Date.now() / 1000) - 7200,
+    time: Math.floor(Date.now() / 1000) - 3600,
   }
 ];
 
 export function NewsWidget() {
-  const [news, setNews] = useState<NewsItem[]>([]);
+  const [newsPool, setNewsPool] = useState<NewsItem[]>([]);
+  const [visibleNews, setVisibleNews] = useState<NewsItem[]>([]);
+  const [poolIndex, setPoolIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'ALL' | 'REAL_WORLD' | 'CYBER_SEC'>('ALL');
-  const [decryptionSuccessRate, setDecryptionSuccessRate] = useState(99.4);
+  const [filter, setFilter] = useState<'ALL' | 'WORLD' | 'TECH_SCIENCE' | 'ENTER_BIZ'>('ALL');
+  
+  const [decryptionRate, setDecryptionRate] = useState(99.6);
   const [scanPulse, setScanPulse] = useState(false);
+  const [latestIntercept, setLatestIntercept] = useState<NewsItem | null>(null);
+  const [interceptTimer, setInterceptTimer] = useState<number>(8); // countdown till next incoming intercept
 
-  const fetchHackerNews = async () => {
+  // 1. Fetch World news from server backend
+  const fetchGlobalFeeds = async () => {
     setLoading(true);
     setScanPulse(true);
     try {
-      // 1. Fetch top technology stories from Hacker News
-      const topStoriesRes = await fetch('https://hacker-news.firebaseio.com/v0/topstories.json');
-      if (!topStoriesRes.ok) throw new Error('Query error');
-      const topStoryIds = await topStoriesRes.json();
+      const response = await fetch('/api/news');
+      if (!response.ok) throw new Error('API server unreachable');
+      const data = await response.json();
       
-      // Take top 6 items
-      const selectedIds = topStoryIds.slice(0, 6);
-      const itemsPromise = selectedIds.map(async (id: number) => {
-        try {
-          const itemRes = await fetch(`https://hacker-news.firebaseio.com/v0/item/${id}.json`);
-          if (!itemRes.ok) return null;
-          return await itemRes.json();
-        } catch {
-          return null;
-        }
-      });
-      
-      const rawStories = await Promise.all(itemsPromise);
-      const hnStories: NewsItem[] = rawStories
-        .filter(item => item && item.title)
-        .map((item, index) => ({
-          id: `hn-${item.id}`,
-          title: item.title,
-          url: item.url || `https://news.ycombinator.com/item?id=${item.id}`,
-          by: item.by || 'ANON_AGENT',
-          time: item.time,
-          type: 'real',
-          category: index % 2 === 0 ? 'INTEL' : 'CORE'
-        }));
-
-      // Combine with some cyber deck alerts
-      const combined = [...hnStories, ...CYBERNET_MOCK_ALERTS].sort((a, b) => (b.time || 0) - (a.time || 0));
-      setNews(combined);
-      
-      // Randomize decryption success rate for hacker immersion
-      setDecryptionSuccessRate(parseFloat((98 + Math.random() * 1.9).toFixed(2)));
+      if (Array.isArray(data) && data.length > 0) {
+        setNewsPool(data);
+        
+        // Initial slice: show top 5 items immediately
+        const count = Math.min(5, data.length);
+        setVisibleNews(data.slice(0, count));
+        setPoolIndex(count);
+      } else {
+        // Fallback
+        setNewsPool(FALLBACK_DECK_ALERTS);
+        setVisibleNews(FALLBACK_DECK_ALERTS);
+        setPoolIndex(FALLBACK_DECK_ALERTS.length);
+      }
+      setDecryptionRate(parseFloat((98 + Math.random() * 1.95).toFixed(2)));
     } catch (err) {
-      console.error('Failed to query latest news uplink:', err);
-      // Fallback solely to mockup cybernet alerts so UI compiles and works flawlessly
-      setNews(CYBERNET_MOCK_ALERTS);
+      console.error('Failed to parse remote global RSS news stream:', err);
+      setNewsPool(FALLBACK_DECK_ALERTS);
+      setVisibleNews(FALLBACK_DECK_ALERTS);
+      setPoolIndex(FALLBACK_DECK_ALERTS.length);
     } finally {
       setTimeout(() => {
         setLoading(false);
         setScanPulse(false);
-      }, 800);
+      }, 700);
     }
   };
 
   useEffect(() => {
-    fetchHackerNews();
-    
-    // Auto sync feed every 60 seconds
+    fetchGlobalFeeds();
+    // Re-check RSS servers every 90 seconds
     const interval = setInterval(() => {
-      fetchHackerNews();
-    }, 60000);
+      fetchGlobalFeeds();
+    }, 90000);
     return () => clearInterval(interval);
   }, []);
 
-  const filteredNews = news.filter(item => {
-    if (filter === 'REAL_WORLD') return item.type === 'real';
-    if (filter === 'CYBER_SEC') return item.type === 'cybernet';
+  // 2. "One By One All Time" real-time news intercept injector
+  useEffect(() => {
+    if (newsPool.length === 0) return;
+
+    // Countdown clock for intercept
+    const ticker = setInterval(() => {
+      setInterceptTimer(prev => {
+        if (prev <= 1) {
+          // Trigger dynamic injection of single new story!
+          injectNextStory();
+          return 8; // Reset to 8s
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(ticker);
+  }, [newsPool, poolIndex]);
+
+  const injectNextStory = () => {
+    if (newsPool.length === 0) return;
+
+    // Retrieve next item from newsPool list
+    const nextItem = newsPool[poolIndex % newsPool.length];
+    setPoolIndex(prev => prev + 1);
+
+    // Briefly flash the intercept banner to mimic real-time satellite decryption
+    setLatestIntercept(nextItem);
+    setScanPulse(true);
+    
+    setTimeout(() => {
+      setScanPulse(false);
+    }, 500);
+
+    setTimeout(() => {
+      setLatestIntercept(null);
+    }, 2800);
+
+    // Prepend to visible screen, shifting items. Keep max 5 items to block pagination scrollbars
+    setVisibleNews(prev => {
+      // Avoid duplicate sibling stories if pool is very small
+      if (prev.length > 0 && prev[0].title === nextItem.title) {
+        return prev;
+      }
+      return [nextItem, ...prev].slice(0, 5);
+    });
+  };
+
+  const getCategoryStyles = (category?: string) => {
+    switch (category) {
+      case 'WORLD':
+        return {
+          bg: 'bg-red-950/40 border-red-500/40 hover:border-red-500 text-[#e0e0e0]',
+          label: 'INTEL // WAR & POLITICS',
+          labelColor: 'text-red-400 [text-shadow:0_0_3px_#ef4444]',
+          icon: <Flame size={10} className="text-red-500 animate-pulse" />
+        };
+      case 'BUSINESS':
+        return {
+          bg: 'bg-amber-950/30 border-amber-500/30 hover:border-amber-500 text-[#e0e0e0]',
+          label: 'RECON // FINANCIALS',
+          labelColor: 'text-amber-400',
+          icon: <Shield size={10} className="text-amber-500" />
+        };
+      case 'TECHNOLOGY':
+        return {
+          bg: 'bg-cyan-950/30 border-cyan-500/30 hover:border-cyan-500 text-[#e0e0e0]',
+          label: 'DATA_MOD // SYSTEMS',
+          labelColor: 'text-cyber-blue [text-shadow:0_0_3px_#00f3ff]',
+          icon: <Cpu size={10} className="text-cyber-blue animate-pulse" />
+        };
+      case 'ENTERTAINMENT':
+        return {
+          bg: 'bg-fuchsia-950/30 border-fuchsia-500/30 hover:border-fuchsia-500 text-[#e0e0e0]',
+          label: 'MEDIA_BURST // CULTURE',
+          labelColor: 'text-fuchsia-400',
+          icon: <Layers size={10} className="text-fuchsia-500" />
+        };
+      case 'SCIENCE':
+        return {
+          bg: 'bg-emerald-950/30 border-emerald-500/30 hover:border-emerald-500 text-[#e0e0e0]',
+          label: 'CORE_LABS // ECO',
+          labelColor: 'text-matrix-green [text-shadow:0_0_3px_#00ff66]',
+          icon: <Globe size={10} className="text-matrix-green" />
+        };
+      default:
+        return {
+          bg: 'bg-neutral-950/40 border-matrix-green/20 hover:border-matrix-green text-[#e0e0e0]',
+          label: 'SATELLITE // BURST',
+          labelColor: 'text-matrix-green/80',
+          icon: <Server size={10} className="text-matrix-green" />
+        };
+    }
+  };
+
+  // Filter items in the screen slice based on the visual categories
+  const filteredList = visibleNews.filter(item => {
+    if (filter === 'WORLD') return item.category === 'WORLD';
+    if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
+    if (filter === 'ENTER_BIZ') return item.category === 'BUSINESS' || item.category === 'ENTERTAINMENT';
     return true;
   });
 
-  const getSeverityStyle = (severity?: 'LOW' | 'MED' | 'HIGH' | 'CRITICAL') => {
-    switch (severity) {
-      case 'CRITICAL':
-        return 'bg-red-950/80 border-red-500 text-red-400 [text-shadow:0_0_5px_#ef4444]';
-      case 'HIGH':
-        return 'bg-amber-950/60 border-amber-500 text-amber-400';
-      case 'MED':
-        return 'bg-blue-950/60 border-cyber-blue text-cyber-blue';
-      default:
-        return 'bg-zinc-950/80 border-matrix-green/30 text-[#e0e0e0]';
-    }
-  };
-
-  const getCategoryIcon = (category?: 'INTEL' | 'THREAT' | 'SYSTEM' | 'CORE') => {
-    switch (category) {
-      case 'THREAT':
-        return <AlertTriangle size={10} className="text-red-500 shrink-0" />;
-      case 'SYSTEM':
-        return <Server size={10} className="text-matrix-green shrink-0 animate-pulse" />;
-      case 'CORE':
-        return <Globe size={10} className="text-cyber-blue shrink-0" />;
-      default:
-        return <Shield size={10} className="text-cyber-yellow shrink-0" />;
-    }
-  };
-
   return (
-    <div className="flex flex-col h-full overflow-hidden bg-black/85 border border-matrix-green/20 p-4 rounded shadow-[inset_0_0_15px_rgba(0,255,102,0.05)] text-xs font-mono">
+    <div className="flex flex-col h-full overflow-hidden bg-black/90 border border-matrix-green/20 p-4 rounded shadow-[0_0_15px_rgba(0,255,102,0.03)] text-xs font-mono relative">
+      
+      {/* Visual cyber scanning indicators */}
+      <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-matrix-green/30 to-transparent animate-pulse" />
+
       {/* Widget Header */}
-      <div className="flex items-center justify-between border-b border-matrix-green/20 pb-2 mb-3">
+      <div className="flex items-center justify-between border-b-2 border-matrix-green/20 pb-2 mb-3 select-none">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${scanPulse ? 'bg-cyber-blue' : 'bg-matrix-green'}`} />
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${scanPulse ? 'bg-cyber-blue' : 'bg-matrix-green'}`} />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${scanPulse ? 'bg-red-500' : 'bg-matrix-green'}`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${scanPulse ? 'bg-red-500' : 'bg-matrix-green'}`} />
           </span>
-          <h2 className="text-[10px] font-heading font-bold tracking-widest text-[#E0E0E0] uppercase flex items-center gap-1.5">
-            <Radio size={12} className={scanPulse ? 'animate-spin' : ''} />
-            NEWS_INTEL // GLOBAL
+          <h2 className="text-[10px] font-heading font-extrabold tracking-widest text-matrix-green uppercase flex items-center gap-1.5 [text-shadow:0_0_5px_rgba(0,255,102,0.4)]">
+            <Radio size={12} className={scanPulse ? 'animate-bounce' : ''} />
+            LIVE_WORLD_NEWS // INTERCEPT
           </h2>
         </div>
-        <button 
-          onClick={fetchHackerNews} 
-          disabled={loading}
-          className="p-1 hover:bg-matrix-green/10 text-matrix-green/70 hover:text-matrix-green rounded border border-transparent hover:border-matrix-green/20 transition-all cursor-pointer"
-          title="Rescan uplinks"
-        >
-          <RefreshCw size={11} className={loading ? 'animate-spin' : ''} />
-        </button>
+        
+        {/* Countdown to next feed insert */}
+        <div className="text-[8px] text-neutral-400 bg-neutral-950 px-1.5 py-0.5 rounded border border-matrix-green/10 flex items-center gap-1.5">
+          <span className="text-[#606060] uppercase font-bold text-[7px]">DECRYPT IN:</span>
+          <span className="text-matrix-green font-bold w-3 text-center">{interceptTimer}s</span>
+        </div>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-2 gap-2 mb-3 bg-neutral-950/60 p-2 border border-matrix-green/10 rounded select-none text-[9px] text-[#A0A0A0]">
+      {/* Decryption Telemetry Grid */}
+      <div className="grid grid-cols-2 gap-2 mb-3 bg-neutral-950 p-2 border border-matrix-green/15 rounded select-none text-[8.5px] text-[#A0A0A0]">
         <div className="flex flex-col">
-          <span className="uppercase text-[8px] text-matrix-green/50">Uplink Status</span>
-          <span className="text-matrix-green font-bold">[SYNCED_OK]</span>
+          <span className="uppercase text-[7.5px] text-matrix-green/40 font-bold">Uplink Gateway</span>
+          <span className="text-matrix-green font-bold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-matrix-green animate-pulse" />
+            BBC_GLOBAL_LIVE
+          </span>
         </div>
         <div className="flex flex-col">
-          <span className="uppercase text-[8px] text-cyber-blue/50">DR_SUCCESS</span>
-          <span className="text-cyber-blue font-bold">{decryptionSuccessRate}%</span>
+          <span className="uppercase text-[7.5px] text-cyber-blue/40 font-bold">Signal Accuracy</span>
+          <span className="text-cyber-blue font-bold">{decryptionRate}% [OK]</span>
         </div>
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex items-center gap-1.5 mb-3 border-b border-matrix-green/10 pb-2">
+      <div className="flex items-center gap-1 mb-2.5 border-b border-matrix-green/10 pb-2 select-none">
         <button 
           onClick={() => setFilter('ALL')}
-          className={`px-2 py-0.5 rounded text-[8px] tracking-widest uppercase border transition-all ${filter === 'ALL' ? 'bg-matrix-green/10 text-matrix-green border-matrix-green/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'ALL' ? 'bg-matrix-green/20 text-matrix-green border-matrix-green' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
         >
           ALL
         </button>
         <button 
-          onClick={() => setFilter('REAL_WORLD')}
-          className={`px-2 py-0.5 rounded text-[8px] tracking-widest uppercase border transition-all ${filter === 'REAL_WORLD' ? 'bg-cyber-blue/10 text-cyber-blue border-cyber-blue/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+          onClick={() => setFilter('WORLD')}
+          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'WORLD' ? 'bg-red-950/40 text-red-400 border-red-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
         >
-          REAL_WORLD
+          POLITICS/WAR
         </button>
         <button 
-          onClick={() => setFilter('CYBER_SEC')}
-          className={`px-2 py-0.5 rounded text-[8px] tracking-widest uppercase border transition-all ${filter === 'CYBER_SEC' ? 'bg-cyber-yellow/10 text-cyber-yellow border-cyber-yellow/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+          onClick={() => setFilter('TECH_SCIENCE')}
+          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'TECH_SCIENCE' ? 'bg-cyan-950/40 text-cyan-400 border-cyan-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
         >
-          CYBER_SEC
+          TECH/SCI
+        </button>
+        <button 
+          onClick={() => setFilter('ENTER_BIZ')}
+          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'ENTER_BIZ' ? 'bg-amber-950/40 text-amber-400 border-amber-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+        >
+          ENT/BIZ
         </button>
       </div>
 
-      {/* Feed Container */}
-      <div className="flex-1 overflow-y-auto space-y-2.5 pr-1 scrollbar-thin scrollbar-thumb-matrix-green/20 scrollbar-track-transparent">
-        <AnimatePresence mode="popLayout">
+      {/* Flash live popup on new packet arrival to mimic high-end hollywood deck terminal */}
+      <AnimatePresence>
+        {latestIntercept && (
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95, y: -5 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: -5 }}
+            className="absolute top-24 left-4 right-4 z-20 bg-red-950/95 border-2 border-red-500 p-3 rounded shadow-[0_0_20px_rgba(239,68,68,0.4)] flex flex-col gap-1.5"
+          >
+            <div className="flex items-center gap-1.5 text-[8px] font-extrabold text-red-400 tracking-widest uppercase">
+              <AlertTriangle size={10} className="animate-bounce" />
+              <span>LIVE WIRE TRANSCEIVER DECRYPTING ...</span>
+            </div>
+            <p className="text-[10px] text-white leading-relaxed font-bold tracking-normal uppercase line-clamp-2">
+              {latestIntercept.title}
+            </p>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Feed Container (Limited to 5 items to guarantee no scrollbar is visible) */}
+      <div className="flex-1 flex flex-col justify-between overflow-hidden gap-2.5">
+        <AnimatePresence mode="popLayout" initial={false}>
           {loading ? (
-            <div className="space-y-3 py-6">
-              {[1, 2, 3, 4].map(num => (
-                <div key={num} className="animate-pulse space-y-2 border border-matrix-green/10 p-2.5 rounded bg-neutral-950/40">
-                  <div className="h-2 bg-matrix-green/20 rounded w-1/4" />
-                  <div className="h-3 bg-matrix-green/15 rounded w-full" />
-                  <div className="h-2 bg-matrix-green/10 rounded w-1/2" />
+            <div className="flex-1 flex flex-col justify-around py-3">
+              {[1, 2, 3, 4, 5].map(num => (
+                <div key={num} className="animate-pulse space-y-1.5 border border-matrix-green/10 p-2 rounded bg-neutral-950/40">
+                  <div className="h-2 bg-matrix-green/15 rounded w-1/4" />
+                  <div className="h-3 bg-matrix-green/10 rounded w-full" />
                 </div>
               ))}
             </div>
-          ) : filteredNews.length === 0 ? (
-            <div className="text-center py-12 text-neutral-500">
-              <p className="tracking-widest uppercase text-[10px]">NO_MATCHING_FEEDS</p>
-              <p className="text-[9px] mt-1">UPLINK FILTER CLEAR</p>
+          ) : filteredList.length === 0 ? (
+            <div className="flex-1 flex flex-col items-center justify-center text-center py-6 text-[#505050]">
+              <AlertTriangle size={24} className="mb-2" />
+              <p className="tracking-widest uppercase text-[10px]">NO_MATCHING_STREAM</p>
+              <p className="text-[8px] mt-1">UPLINK FILTER UNMATCHED</p>
             </div>
           ) : (
-            filteredNews.map((item, index) => (
-              <motion.div
-                key={item.id}
-                initial={{ opacity: 0, x: 10 }}
-                animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -10 }}
-                transition={{ duration: 0.2, delay: index * 0.05 }}
-                className={`p-2.5 border-l-2 rounded-r transition-all duration-300 relative group/card bg-neutral-950/40 hover:bg-neutral-900/60 ${
-                  item.type === 'cybernet' 
-                    ? getSeverityStyle(item.severity) 
-                    : 'border-matrix-green/30 hover:border-matrix-green text-[#e0e0e0]'
-                }`}
-              >
-                {/* Visual hover glitch side accent */}
-                <div className="absolute top-0 right-0 w-[1px] h-0 bg-matrix-green group-hover/card:h-full transition-all duration-300" />
+            filteredList.map((item, index) => {
+              const styles = getCategoryStyles(item.category);
+              return (
+                <motion.div
+                  key={item.id}
+                  layout="position"
+                  initial={{ opacity: 0, x: -15, scale: 0.98 }}
+                  animate={{ opacity: 1, x: 0, scale: 1 }}
+                  exit={{ opacity: 0, x: 15, scale: 0.98 }}
+                  transition={{ type: "spring", stiffness: 350, damping: 25 }}
+                  className={`p-2.5 border-l-2 rounded-r transition-all duration-300 relative group/card bg-neutral-950/55 ${styles.bg}`}
+                >
+                  {/* Glowing light edge on hover */}
+                  <div className="absolute top-0 right-0 w-[1.5px] h-0 bg-matrix-green group-hover/card:h-full transition-all duration-300" />
 
-                <div className="flex items-center gap-1.5 text-[8px] uppercase font-bold tracking-wider mb-1.5 text-neutral-400 select-none">
-                  {getCategoryIcon(item.category)}
-                  <span>{item.category || 'FEED'}</span>
-                  <span>//</span>
-                  <span className="text-[8px] font-normal font-mono opacity-80 uppercase tracking-widest">
-                    {item.time ? new Date(item.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'UPLINK'}
-                  </span>
-                </div>
+                  <div className="flex items-center justify-between text-[8px] uppercase font-extrabold tracking-wider mb-1 text-neutral-400 select-none">
+                    <div className="flex items-center gap-1.5">
+                      {styles.icon}
+                      <span className={styles.labelColor}>{styles.label}</span>
+                    </div>
+                    <span className="text-[7.5px] font-normal text-neutral-500 uppercase tracking-widest">
+                      {item.time ? new Date(item.time * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'UPLINK'}
+                    </span>
+                  </div>
 
-                <p className="leading-relaxed font-mono tracking-wide text-[11px] mb-1 text-[#eaeaea] group-hover/card:text-white transition-colors">
-                  {item.title}
-                </p>
+                  {/* Title */}
+                  <p className="leading-snug tracking-normal text-[10px] sm:text-[11px] mb-1 font-bold text-[#e6e6e6] group-hover/card:text-white transition-colors">
+                    {item.title}
+                  </p>
 
-                <div className="flex items-center justify-between mt-2 select-none">
-                  <span className="text-[8px] text-[#808080] font-mono uppercase tracking-widest">
-                    BY: {item.by || 'SYS_INTEL'}
-                  </span>
-                  
-                  {item.url && (
-                    <a 
-                      href={item.url} 
-                      target="_blank" 
-                      rel="noopener noreferrer" 
-                      className="text-matrix-green hover:text-white flex items-center gap-1 text-[9px] transition-colors hover:[text-shadow:0_0_6px_rgba(0,255,102,0.8)] pb-0.5 border-b border-transparent hover:border-matrix-green/40 mt-1"
-                    >
-                      <span>RESOLVE</span>
-                      <ExternalLink size={8} />
-                    </a>
-                  )}
-                </div>
-              </motion.div>
-            ))
+                  <p className="text-[9px] text-neutral-400 font-normal leading-normal line-clamp-1 mb-1 font-mono">
+                    {item.description || 'Secure encrypted transmission successfully filtered.'}
+                  </p>
+
+                  <div className="flex items-center justify-between mt-1 select-none">
+                    <span className="text-[7px] text-[#707070] font-mono font-bold uppercase tracking-widest">
+                      SOURCE: {item.by || 'BBC NEWS'}
+                    </span>
+                    
+                    {item.url && (
+                      <a 
+                        href={item.url} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-matrix-green hover:text-white flex items-center gap-0.5 text-[8.5px] font-bold transition-all hover:[text-shadow:0_0_6px_rgba(0,255,102,0.8)] border-b border-transparent hover:border-matrix-green/40"
+                      >
+                        <span>RESOLVE</span>
+                        <ExternalLink size={7} />
+                      </a>
+                    )}
+                  </div>
+                </motion.div>
+              );
+            })
           )}
         </AnimatePresence>
       </div>
 
-      {/* Bottom ticker banner */}
-      <div className="mt-3 border-t border-matrix-green/10 pt-2 text-[8px] text-matrix-green/40 uppercase tracking-[0.25em] flex justify-between select-none">
-        <span className="animate-pulse">FEED_MATRIX_UPLINK</span>
-        <span>SYSVERS_x9.04</span>
+      {/* Bottom Ticker System Info */}
+      <div className="mt-3 border-t border-matrix-green/10 pt-2 text-[8px] text-matrix-green/30 uppercase tracking-[0.2em] flex justify-between select-none">
+        <span className="animate-pulse">AUTOSTREAM_READY</span>
+        <span>SYS_SECLEVEL_AES</span>
       </div>
     </div>
   );
