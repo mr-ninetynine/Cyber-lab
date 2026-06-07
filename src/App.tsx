@@ -107,7 +107,17 @@ function CyberLabApp() {
   const [statusText, setStatusText] = useState('SYSTEM IDLE');
   const [apiError, setApiError] = useState<string | null>(null);
   const [apiDiagnostic, setApiDiagnostic] = useState<any>(null);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
   const [attachedFiles, setAttachedFiles] = useState<(AttachedFile & { name: string, id: string })[]>([]);
+
+  const handleCopy = (text: string, index: number) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopiedIndex(index);
+      setTimeout(() => setCopiedIndex(null), 2000);
+    }).catch(err => {
+      console.error('Failed to copy text: ', err);
+    });
+  };
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const recognitionRef = useRef<any>(null);
@@ -1009,16 +1019,36 @@ function CyberLabApp() {
                       <div 
                         key={i} 
                         className={cn(
-                          "flex flex-col gap-1 w-full",
+                          "flex flex-col gap-1.5 w-full group",
                           msg.role === 'user' ? "items-end" : "items-start"
                         )}
                       >
                         <div className={cn(
-                          "flex items-center gap-1.5 text-[10px] uppercase font-bold tracking-widest select-none",
-                          msg.role === 'user' ? "text-matrix-green/50" : "text-cyber-blue"
+                          "flex items-center justify-between w-full max-w-[95%] md:max-w-[85%] text-[10px] uppercase font-bold tracking-widest select-none pb-0.5",
+                          msg.role === 'user' ? "text-matrix-green/50 flex-row-reverse" : "text-cyber-blue flex-row"
                         )}>
-                          <span>[{msg.role === 'user' ? 'OPERATOR_SHELL' : 'LAB_ORACLE'}]</span>
-                          <span className="text-neutral-500 font-normal">TIMESTAMP: {new Date().toLocaleTimeString()}</span>
+                          <div className={cn("flex items-center gap-2", msg.role === 'user' && "flex-row-reverse")}>
+                            <span>[{msg.role === 'user' ? 'OPERATOR_SHELL' : 'LAB_ORACLE'}]</span>
+                            <span className="text-neutral-500 font-normal">TIMESTAMP: {new Date().toLocaleTimeString()}</span>
+                          </div>
+                          
+                          <button
+                            onClick={() => handleCopy(msg.content, i)}
+                            className="flex items-center gap-1 py-0.5 px-1.5 rounded bg-neutral-950/45 hover:bg-matrix-green/10 text-neutral-400 hover:text-matrix-green border border-transparent hover:border-matrix-green/30 transition-all font-mono uppercase text-[8.5px] cursor-pointer select-none"
+                            title="Copy response payload"
+                          >
+                            {copiedIndex === i ? (
+                              <>
+                                <Check size={10} className="text-matrix-green animate-pulse" />
+                                <span className="text-matrix-green font-bold">COPIED_OK</span>
+                              </>
+                            ) : (
+                              <>
+                                <Copy size={10} className="opacity-70 group-hover:opacity-100" />
+                                <span className="opacity-70 group-hover:opacity-100">COPY</span>
+                              </>
+                            )}
+                          </button>
                         </div>
                         
                         <div className={cn(

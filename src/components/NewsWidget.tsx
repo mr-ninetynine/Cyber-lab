@@ -9,65 +9,65 @@ interface NewsItem {
   by?: string;
   time?: number;
   type: 'real' | 'cybernet';
-  category?: 'WORLD' | 'BUSINESS' | 'TECHNOLOGY' | 'ENTERTAINMENT' | 'SCIENCE' | 'CYBER' | 'THREAT' | 'SYSTEM' | 'CORE';
+  category?: 'WORLD' | 'BUSINESS' | 'TECHNOLOGY' | 'ENTERTAINMENT' | 'SCIENCE' | 'BANGLADESH' | 'THREAT' | 'SYSTEM' | 'CORE';
   severity?: 'LOW' | 'MED' | 'HIGH' | 'CRITICAL';
   description?: string;
 }
 
-const CYBER_NEWS_DATA: NewsItem[] = [
+const BANGLADESH_NEWS_DATA: NewsItem[] = [
   {
-    id: 'cyber-1',
-    title: 'ZERO-DAY DETECTION: Active exploits found targeting enterprise quantum firewall routers; patches deploy globally.',
+    id: 'bd-1',
+    title: 'METRO RAIL EXPANSION: Dhaka Mass Rapid Transit Line-6 records highest ridership of 350,000 daily passengers; planning new route tracks.',
     type: 'cybernet',
-    category: 'CYBER',
-    severity: 'CRITICAL',
-    description: 'Security agency warns of targeted advanced persistent threats using polymorphic bypass techniques.',
-    by: 'CYBER DEFENSE'
-  },
-  {
-    id: 'cyber-2',
-    title: 'RANSOMWARE DOWN: Global coalition of cybersecurity units offline major dark-web extortion cluster.',
-    type: 'cybernet',
-    category: 'CYBER',
+    category: 'BANGLADESH',
     severity: 'HIGH',
-    description: 'Multinational taskforce recovers decryption matrix keys, rescuing hundreds of affected corporate subnetworks.',
-    by: 'INTERPOL INTEL'
+    description: 'Rapid mass transit expansion eases central business district travel times significantly.',
+    by: 'DHAKA TRIBUNE'
   },
   {
-    id: 'cyber-3',
-    title: 'DECENTRALIZED ENCRYPTION ROTATION: Zero-knowledge proofs deployed to secure autonomous routing channels.',
+    id: 'bd-2',
+    title: 'SMART DIGITAL REVOLUTION: Mobile financial gateway system hits landmark transaction speed with secure biometric verification.',
     type: 'cybernet',
-    category: 'CYBER',
+    category: 'BANGLADESH',
     severity: 'MED',
-    description: 'New protocol enables completely secure, mathematically sound data relay paths without trusted authorities.',
-    by: 'CORE SEC'
+    description: 'Fintech ecosystems flourish as digital payment services push deep into rural marketplaces.',
+    by: 'DAILY STAR'
   },
   {
-    id: 'cyber-4',
-    title: 'AI DEFENSE SECTOR: Automated countermeasure units expand virtual sweep inside sovereign cloud networks.',
+    id: 'bd-3',
+    title: 'INFO-TECH CORRIDOR: Bangladesh High-Tech Park Authority welcomes 15 new international technology venture partnerships.',
     type: 'cybernet',
-    category: 'CYBER',
-    severity: 'LOW',
-    description: 'Neural firewall agents successfully mitigate 14 million daily probing attempts targeting grid relays.',
-    by: 'SENTRY AI'
-  },
-  {
-    id: 'cyber-5',
-    title: 'BIOS LEVEL INTEGRITY PATCH: Hardware manufacturers dispatch firmware updates to neutralize side-channel vulnerabilities.',
-    type: 'cybernet',
-    category: 'CYBER',
+    category: 'BANGLADESH',
     severity: 'HIGH',
-    description: 'Critical microprocessor leak path discovered and mitigated at hardware bus execution queues.',
-    by: 'CHIPSEC LABS'
+    description: 'Billion-dollar tech hubs ready to employ 50,000 neural network and soft architecture graduates.',
+    by: 'THE DAILY STAR'
   },
   {
-    id: 'cyber-6',
-    title: 'SATELLITE DATA LINK COMPROMISE: Strategic tracking relays switched back to terrestrial emergency lines after signal spoof.',
+    id: 'bd-4',
+    title: 'GREEN POWER INTEGRATION: Rooppur Nuclear Power Station executes trial unit connectivity checks with zero emissions.',
     type: 'cybernet',
-    category: 'CYBER',
+    category: 'BANGLADESH',
     severity: 'CRITICAL',
-    description: 'Secure payload telemetry re-routed using high-grade optical lines; encryption rotates safely.',
-    by: 'SPACE COMMAND'
+    description: 'Nuclear energy experts verify initial power synchronization loop across central grid pathways.',
+    by: 'DHAKA TRIBUNE'
+  },
+  {
+    id: 'bd-5',
+    title: 'EXPORT RESILIENCE: Industrial garments manufacturing leverages AI-optimized routing to streamline world deliveries.',
+    type: 'cybernet',
+    category: 'BANGLADESH',
+    severity: 'MED',
+    description: 'Automated logistics networks boost dispatch speeds for European and North American retail shipments.',
+    by: 'DAILY STAR'
+  },
+  {
+    id: 'bd-6',
+    title: 'PADDY AGRITECH DISCOVERY: Climate-resilient salinity-tolerant crop strains successfully harvested in southern coastal bands.',
+    type: 'cybernet',
+    category: 'BANGLADESH',
+    severity: 'HIGH',
+    description: 'Breakthrough seeds enable round-the-clock cultivation despite hostile high-tide environments.',
+    by: 'DHAKA TRIBUNE'
   }
 ];
 
@@ -76,14 +76,14 @@ export function NewsWidget() {
   const [visibleNews, setVisibleNews] = useState<NewsItem[]>([]);
   const [poolIndex, setPoolIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'ALL' | 'WORLD' | 'TECH_SCIENCE' | 'CYBER'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'WORLD' | 'TECH_SCIENCE' | 'BANGLADESH'>('ALL');
   
   const [decryptionRate, setDecryptionRate] = useState(99.6);
   const [scanPulse, setScanPulse] = useState(false);
   const [latestIntercept, setLatestIntercept] = useState<NewsItem | null>(null);
   const [interceptTimer, setInterceptTimer] = useState<number>(8); // countdown till next incoming intercept
 
-  // 1. Fetch World news from server backend
+  // 1. Fetch World & Bangladesh news from server backend
   const fetchGlobalFeeds = async () => {
     setLoading(true);
     setScanPulse(true);
@@ -96,18 +96,18 @@ export function NewsWidget() {
         console.error('API server returned error status:', response.status);
       }
       
-      // Map cyber data with dynamic timestamps so they list chronologically with RSS news
+      // Map Bangladesh data with dynamic timestamps so they list chronologically with RSS news
       const baseTime = Math.floor(Date.now() / 1000);
-      const freshCyber = CYBER_NEWS_DATA.map((item, index) => ({
+      const freshBD = BANGLADESH_NEWS_DATA.map((item, index) => ({
         ...item,
         time: baseTime - (index * 600) // spread out 10 mins apart
       }));
 
       let combined: NewsItem[] = [];
       if (Array.isArray(data) && data.length > 0) {
-        combined = [...data, ...freshCyber].sort((a, b) => (b.time || 0) - (a.time || 0));
+        combined = [...data, ...freshBD].sort((a, b) => (b.time || 0) - (a.time || 0));
       } else {
-        combined = freshCyber;
+        combined = freshBD;
       }
 
       setNewsPool(combined);
@@ -116,7 +116,7 @@ export function NewsWidget() {
       const matchingPool = combined.filter(item => {
         if (filter === 'WORLD') return item.category === 'WORLD';
         if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
-        if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+        if (filter === 'BANGLADESH') return item.category === 'BANGLADESH' || item.type === 'cybernet';
         return true;
       });
 
@@ -127,14 +127,14 @@ export function NewsWidget() {
       setDecryptionRate(parseFloat((98 + Math.random() * 1.95).toFixed(2)));
     } catch (err) {
       console.error('Failed to parse remote global RSS news stream:', err);
-      // Fallback solely to mockup cybernet alerts so UI compiles and works flawlessly
+      // Fallback solely to mockup Bangladesh alerts so UI compiles and works flawlessly
       const baseTime = Math.floor(Date.now() / 1000);
-      const freshCyber = CYBER_NEWS_DATA.map((item, index) => ({
+      const freshBD = BANGLADESH_NEWS_DATA.map((item, index) => ({
         ...item,
         time: baseTime - (index * 600)
       }));
-      setNewsPool(freshCyber);
-      setVisibleNews(freshCyber.slice(0, 5));
+      setNewsPool(freshBD);
+      setVisibleNews(freshBD.slice(0, 5));
       setPoolIndex(5);
     } finally {
       setTimeout(() => {
@@ -160,7 +160,7 @@ export function NewsWidget() {
     const matchingPool = newsPool.filter(item => {
       if (filter === 'WORLD') return item.category === 'WORLD';
       if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
-      if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+      if (filter === 'BANGLADESH') return item.category === 'BANGLADESH' || item.type === 'cybernet';
       return true;
     });
 
@@ -195,7 +195,7 @@ export function NewsWidget() {
     const matchingPool = newsPool.filter(item => {
       if (filter === 'WORLD') return item.category === 'WORLD';
       if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
-      if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+      if (filter === 'BANGLADESH') return item.category === 'BANGLADESH' || item.type === 'cybernet';
       return true;
     });
 
@@ -264,12 +264,12 @@ export function NewsWidget() {
           labelColor: 'text-matrix-green [text-shadow:0_0_3px_#00ff66]',
           icon: <Globe size={10} className="text-matrix-green" />
         };
-      case 'CYBER':
+      case 'BANGLADESH':
         return {
-          bg: 'bg-yellow-950/20 border-yellow-500/30 hover:border-yellow-500 text-[#e0e0e0]',
-          label: 'ALERT // CYBERSEC INTEL',
-          labelColor: 'text-yellow-400 [text-shadow:0_0_3px_rgba(234,179,8,0.5)]',
-          icon: <Cpu size={10} className="text-yellow-500 animate-pulse" />
+          bg: 'bg-emerald-950/20 border-emerald-500/20 hover:border-red-500/80 text-[#e0e0e0]',
+          label: 'DISPATCH // BANGLADESH NEWS',
+          labelColor: 'text-emerald-400 [text-shadow:0_0_3px_#10b981]',
+          icon: <Globe size={10} className="text-[#00ff66] animate-pulse" />
         };
       default:
         return {
@@ -285,7 +285,7 @@ export function NewsWidget() {
   const filteredList = visibleNews.filter(item => {
     if (filter === 'WORLD') return item.category === 'WORLD';
     if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
-    if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+    if (filter === 'BANGLADESH') return item.category === 'BANGLADESH' || item.type === 'cybernet';
     return true;
   });
 
@@ -299,8 +299,8 @@ export function NewsWidget() {
       <div className="flex items-center justify-between border-b-2 border-matrix-green/20 pb-2 mb-3 select-none">
         <div className="flex items-center gap-2">
           <span className="relative flex h-2 w-2">
-            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${scanPulse ? 'bg-red-500' : 'bg-matrix-green'}`} />
-            <span className={`relative inline-flex rounded-full h-2 w-2 ${scanPulse ? 'bg-red-500' : 'bg-matrix-green'}`} />
+            <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${scanPulse ? 'bg-emerald-500' : 'bg-matrix-green'}`} />
+            <span className={`relative inline-flex rounded-full h-2 w-2 ${scanPulse ? 'bg-emerald-500' : 'bg-matrix-green'}`} />
           </span>
           <h2 className="text-[10px] font-heading font-extrabold tracking-widest text-matrix-green uppercase flex items-center gap-1.5 [text-shadow:0_0_5px_rgba(0,255,102,0.4)]">
             <Radio size={12} className={scanPulse ? 'animate-bounce' : ''} />
@@ -321,7 +321,7 @@ export function NewsWidget() {
           <span className="uppercase text-[7.5px] text-matrix-green/40 font-bold">Uplink Gateway</span>
           <span className="text-matrix-green font-bold flex items-center gap-1">
             <span className="w-1.5 h-1.5 rounded-full bg-matrix-green animate-pulse" />
-            BBC_GLOBAL_LIVE
+            BBC_BD_LIVE
           </span>
         </div>
         <div className="flex flex-col">
@@ -351,10 +351,10 @@ export function NewsWidget() {
           TECH/SCI
         </button>
         <button 
-          onClick={() => setFilter('CYBER')}
-          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'CYBER' ? 'bg-yellow-950/40 text-yellow-500 border-yellow-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+          onClick={() => setFilter('BANGLADESH')}
+          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'BANGLADESH' ? 'bg-emerald-950/40 text-[#00ff66] border-emerald-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
         >
-          CYBER
+          BANGLADESH
         </button>
       </div>
 

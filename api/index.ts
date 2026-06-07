@@ -43,14 +43,15 @@ async function startServer() {
     });
   });
 
-  // Aggregated Real World News parser endpoints from authoritative RSS Feeds (BBC)
+  // Aggregated Real World News parser endpoints from authoritative RSS Feeds (BBC & BD Media)
   app.get("/api/news", async (req, res) => {
     const feeds = [
       { category: "WORLD", url: "https://feeds.bbci.co.uk/news/world/rss.xml" },
       { category: "BUSINESS", url: "https://feeds.bbci.co.uk/news/business/rss.xml" },
       { category: "TECHNOLOGY", url: "https://feeds.bbci.co.uk/news/technology/rss.xml" },
-      { category: "ENTERTAINMENT", url: "https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml" },
-      { category: "SCIENCE", url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" }
+      { category: "SCIENCE", url: "https://feeds.bbci.co.uk/news/science_and_environment/rss.xml" },
+      { category: "BANGLADESH", url: "https://www.thedailystar.net/news/bangladesh/rss.xml" },
+      { category: "BANGLADESH", url: "https://www.dhakatribune.com/feed" }
     ];
 
     function parseRSS(xmlText: string, category: string): any[] {
@@ -86,7 +87,7 @@ async function startServer() {
           time: pubDate ? Math.floor(new Date(pubDate).getTime() / 1000) : Math.floor(Date.now() / 1000),
           type: "real",
           category: category,
-          by: "BBC INTEL"
+          by: category === "BANGLADESH" ? (link.includes("thedailystar") ? "THE DAILY STAR" : "DHAKA TRIBUNE") : "BBC INTEL"
         });
       }
       return items;
@@ -98,7 +99,13 @@ async function startServer() {
           try {
             const controller = new AbortController();
             const timeoutId = setTimeout(() => controller.abort(), 4000); // 4s timeout per feed
-            const res = await fetch(feed.url, { signal: controller.signal });
+            const res = await fetch(feed.url, { 
+              signal: controller.signal,
+              headers: {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/115.0.0.0 Safari/537.36",
+                "Accept": "application/xml, text/xml, */*"
+              }
+            });
             clearTimeout(timeoutId);
             if (!res.ok) return [];
             const text = await res.text();
