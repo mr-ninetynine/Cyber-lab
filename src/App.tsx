@@ -25,6 +25,7 @@ import Markdown from 'react-markdown';
 import { generateCyberLabResponse, transcribeAudio, generateSpeech, type AttachedFile } from './services/geminiService';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { NewsWidget } from './components/NewsWidget';
 
 // Utility for tailwind classes
 function cn(...inputs: ClassValue[]) {
@@ -870,7 +871,7 @@ function CyberLabApp() {
         </div>
 
         {/* Outer Split Deck Body Grid */}
-        <div className="flex-1 grid grid-cols-1 lg:grid-cols-4 gap-4 overflow-hidden relative min-h-0">
+        <div className="flex-1 grid grid-cols-1 lg:grid-cols-5 gap-4 overflow-hidden relative min-h-0">
           
           {/* Cyber Sidebar - Diagnostics HUD */}
           <div className="hidden lg:flex lg:col-span-1 flex-col gap-4 overflow-y-auto bg-black/85 border border-matrix-green/20 p-4 rounded shadow-[inset_0_0_15px_rgba(0,255,102,0.05)] text-[#d4d4d4]">
@@ -1180,6 +1181,11 @@ function CyberLabApp() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          {/* Dynamic News Widget Column */}
+          <div className="hidden lg:flex lg:col-span-1 flex-col overflow-hidden h-full">
+            <NewsWidget />
           </div>
 
         </div>
