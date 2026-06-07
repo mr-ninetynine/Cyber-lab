@@ -400,14 +400,17 @@ export function NewsWidget() {
             filteredList.map((item, index) => {
               const styles = getCategoryStyles(item.category);
               return (
-                <motion.div
+                <motion.a
                   key={item.id}
                   layout="position"
                   initial={{ opacity: 0, x: -15, scale: 0.98 }}
                   animate={{ opacity: 1, x: 0, scale: 1 }}
                   exit={{ opacity: 0, x: 15, scale: 0.98 }}
                   transition={{ type: "spring", stiffness: 350, damping: 25 }}
-                  className={`p-2.5 border-l-2 rounded-r transition-all duration-300 relative group/card bg-neutral-950/55 ${styles.bg}`}
+                  href={item.url || '#'}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={`p-2.5 border-l-2 rounded-r transition-all duration-300 relative group/card bg-neutral-950/55 block cursor-pointer select-none no-underline border-b-transparent hover:border-b-transparent ${styles.bg}`}
                 >
                   {/* Glowing light edge on hover */}
                   <div className="absolute top-0 right-0 w-[1.5px] h-0 bg-matrix-green group-hover/card:h-full transition-all duration-300" />
@@ -437,18 +440,15 @@ export function NewsWidget() {
                     </span>
                     
                     {item.url && (
-                      <a 
-                        href={item.url} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-matrix-green hover:text-white flex items-center gap-0.5 text-[8.5px] font-bold transition-all hover:[text-shadow:0_0_6px_rgba(0,255,102,0.8)] border-b border-transparent hover:border-matrix-green/40"
+                      <div 
+                        className="text-matrix-green group-hover/card:text-white flex items-center gap-0.5 text-[8.5px] font-bold transition-all group-hover/card:[text-shadow:0_0_6px_rgba(0,255,102,0.8)] border-b border-transparent group-hover/card:border-matrix-green/40"
                       >
                         <span>RESOLVE</span>
                         <ExternalLink size={7} />
-                      </a>
+                      </div>
                     )}
                   </div>
-                </motion.div>
+                </motion.a>
               );
             })
           )}
