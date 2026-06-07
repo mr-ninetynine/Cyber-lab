@@ -22,7 +22,8 @@ const BANGLADESH_NEWS_DATA: NewsItem[] = [
     category: 'BANGLADESH',
     severity: 'HIGH',
     description: 'Rapid mass transit expansion eases central business district travel times significantly.',
-    by: 'DHAKA TRIBUNE'
+    by: 'DHAKA TRIBUNE',
+    url: 'https://www.dhakatribune.com/bangladesh/dhaka/341908/dhaka-metro-rail-now'
   },
   {
     id: 'bd-2',
@@ -31,7 +32,8 @@ const BANGLADESH_NEWS_DATA: NewsItem[] = [
     category: 'BANGLADESH',
     severity: 'MED',
     description: 'Fintech ecosystems flourish as digital payment services push deep into rural marketplaces.',
-    by: 'DAILY STAR'
+    by: 'DAILY STAR',
+    url: 'https://www.thedailystar.net/business/news/digital-payments'
   },
   {
     id: 'bd-3',
@@ -40,7 +42,8 @@ const BANGLADESH_NEWS_DATA: NewsItem[] = [
     category: 'BANGLADESH',
     severity: 'HIGH',
     description: 'Billion-dollar tech hubs ready to employ 50,000 neural network and soft architecture graduates.',
-    by: 'THE DAILY STAR'
+    by: 'THE DAILY STAR',
+    url: 'https://www.thedailystar.net/tech-startup/news'
   },
   {
     id: 'bd-4',
@@ -49,7 +52,8 @@ const BANGLADESH_NEWS_DATA: NewsItem[] = [
     category: 'BANGLADESH',
     severity: 'CRITICAL',
     description: 'Nuclear energy experts verify initial power synchronization loop across central grid pathways.',
-    by: 'DHAKA TRIBUNE'
+    by: 'DHAKA TRIBUNE',
+    url: 'https://www.dhakatribune.com/business'
   },
   {
     id: 'bd-5',
@@ -58,7 +62,8 @@ const BANGLADESH_NEWS_DATA: NewsItem[] = [
     category: 'BANGLADESH',
     severity: 'MED',
     description: 'Automated logistics networks boost dispatch speeds for European and North American retail shipments.',
-    by: 'DAILY STAR'
+    by: 'DAILY STAR',
+    url: 'https://www.thedailystar.net/business'
   },
   {
     id: 'bd-6',
@@ -67,7 +72,8 @@ const BANGLADESH_NEWS_DATA: NewsItem[] = [
     category: 'BANGLADESH',
     severity: 'HIGH',
     description: 'Breakthrough seeds enable round-the-clock cultivation despite hostile high-tide environments.',
-    by: 'DHAKA TRIBUNE'
+    by: 'DHAKA TRIBUNE',
+    url: 'https://www.dhakatribune.com/bangladesh/environment/338902'
   }
 ];
 
@@ -110,10 +116,18 @@ export function NewsWidget() {
         combined = freshBD;
       }
 
-      setNewsPool(combined);
+      // De-duplicate news entries by ID to prevent any key duplication
+      const seenIds = new Set<string | number>();
+      const uniqueCombined = combined.filter(item => {
+        if (!item.id || seenIds.has(item.id)) return false;
+        seenIds.add(item.id);
+        return true;
+      });
+
+      setNewsPool(uniqueCombined);
       
       // Set initial buffer items matching the active filter
-      const matchingPool = combined.filter(item => {
+      const matchingPool = uniqueCombined.filter(item => {
         if (filter === 'WORLD') return item.category === 'WORLD';
         if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
         if (filter === 'BANGLADESH') return item.category === 'BANGLADESH' || item.type === 'cybernet';
@@ -133,8 +147,16 @@ export function NewsWidget() {
         ...item,
         time: baseTime - (index * 600)
       }));
-      setNewsPool(freshBD);
-      setVisibleNews(freshBD.slice(0, 5));
+      
+      const fallbackSeen = new Set<string | number>();
+      const uniqueBD = freshBD.filter(item => {
+        if (!item.id || fallbackSeen.has(item.id)) return false;
+        fallbackSeen.add(item.id);
+        return true;
+      });
+
+      setNewsPool(uniqueBD);
+      setVisibleNews(uniqueBD.slice(0, 5));
       setPoolIndex(5);
     } finally {
       setTimeout(() => {
@@ -217,13 +239,10 @@ export function NewsWidget() {
       setLatestIntercept(null);
     }, 2800);
 
-    // Prepend to visible screen, shifting items. Keep max 5 items to block pagination scrollbars
+    // Prepend to visible screen, shifting items and removing any existing duplicate of the injected story
     setVisibleNews(prev => {
-      // Avoid duplicate sibling stories
-      if (prev.length > 0 && prev[0].title === nextItem.title) {
-        return prev;
-      }
-      return [nextItem, ...prev].slice(0, 5);
+      const filtered = prev.filter(item => item.id !== nextItem.id && item.title !== nextItem.title);
+      return [nextItem, ...filtered].slice(0, 5);
     });
   };
 
