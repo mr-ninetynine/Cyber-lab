@@ -9,43 +9,65 @@ interface NewsItem {
   by?: string;
   time?: number;
   type: 'real' | 'cybernet';
-  category?: 'WORLD' | 'BUSINESS' | 'TECHNOLOGY' | 'ENTERTAINMENT' | 'SCIENCE' | 'THREAT' | 'SYSTEM' | 'CORE';
+  category?: 'WORLD' | 'BUSINESS' | 'TECHNOLOGY' | 'ENTERTAINMENT' | 'SCIENCE' | 'CYBER' | 'THREAT' | 'SYSTEM' | 'CORE';
   severity?: 'LOW' | 'MED' | 'HIGH' | 'CRITICAL';
   description?: string;
 }
 
-const FALLBACK_DECK_ALERTS: NewsItem[] = [
+const CYBER_NEWS_DATA: NewsItem[] = [
   {
     id: 'cyber-1',
-    title: 'GEOPOLITICAL ENCRYPTION ROTATION: Allied forces synchronize tactical defense nodes across East Pacific quadrant.',
+    title: 'ZERO-DAY DETECTION: Active exploits found targeting enterprise quantum firewall routers; patches deploy globally.',
     type: 'cybernet',
-    category: 'WORLD',
-    severity: 'LOW',
-    time: Math.floor(Date.now() / 1000) - 300,
+    category: 'CYBER',
+    severity: 'CRITICAL',
+    description: 'Security agency warns of targeted advanced persistent threats using polymorphic bypass techniques.',
+    by: 'CYBER DEFENSE'
   },
   {
     id: 'cyber-2',
-    title: '[POLITICAL RECON] Supreme committee approves fast-track neural quantum legislation amid civil compliance concerns.',
+    title: 'RANSOMWARE DOWN: Global coalition of cybersecurity units offline major dark-web extortion cluster.',
     type: 'cybernet',
-    category: 'WORLD',
-    severity: 'MED',
-    time: Math.floor(Date.now() / 1000) - 1200,
+    category: 'CYBER',
+    severity: 'HIGH',
+    description: 'Multinational taskforce recovers decryption matrix keys, rescuing hundreds of affected corporate subnetworks.',
+    by: 'INTERPOL INTEL'
   },
   {
     id: 'cyber-3',
-    title: 'WASM SYSTEM EXPLOIT: Core telemetry payload injected successfully. Dynamic countermeasures dispatched.',
+    title: 'DECENTRALIZED ENCRYPTION ROTATION: Zero-knowledge proofs deployed to secure autonomous routing channels.',
     type: 'cybernet',
-    category: 'TECHNOLOGY',
-    severity: 'CRITICAL',
-    time: Math.floor(Date.now() / 1000) - 2400,
+    category: 'CYBER',
+    severity: 'MED',
+    description: 'New protocol enables completely secure, mathematically sound data relay paths without trusted authorities.',
+    by: 'CORE SEC'
   },
   {
     id: 'cyber-4',
-    title: 'AI DEFENSE SECTOR: Automated sentinels expand perimeter patrols inside sovereign digital zones.',
+    title: 'AI DEFENSE SECTOR: Automated countermeasure units expand virtual sweep inside sovereign cloud networks.',
     type: 'cybernet',
-    category: 'THREAT',
+    category: 'CYBER',
+    severity: 'LOW',
+    description: 'Neural firewall agents successfully mitigate 14 million daily probing attempts targeting grid relays.',
+    by: 'SENTRY AI'
+  },
+  {
+    id: 'cyber-5',
+    title: 'BIOS LEVEL INTEGRITY PATCH: Hardware manufacturers dispatch firmware updates to neutralize side-channel vulnerabilities.',
+    type: 'cybernet',
+    category: 'CYBER',
     severity: 'HIGH',
-    time: Math.floor(Date.now() / 1000) - 3600,
+    description: 'Critical microprocessor leak path discovered and mitigated at hardware bus execution queues.',
+    by: 'CHIPSEC LABS'
+  },
+  {
+    id: 'cyber-6',
+    title: 'SATELLITE DATA LINK COMPROMISE: Strategic tracking relays switched back to terrestrial emergency lines after signal spoof.',
+    type: 'cybernet',
+    category: 'CYBER',
+    severity: 'CRITICAL',
+    description: 'Secure payload telemetry re-routed using high-grade optical lines; encryption rotates safely.',
+    by: 'SPACE COMMAND'
   }
 ];
 
@@ -54,7 +76,7 @@ export function NewsWidget() {
   const [visibleNews, setVisibleNews] = useState<NewsItem[]>([]);
   const [poolIndex, setPoolIndex] = useState(0);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'ALL' | 'WORLD' | 'TECH_SCIENCE' | 'ENTER_BIZ'>('ALL');
+  const [filter, setFilter] = useState<'ALL' | 'WORLD' | 'TECH_SCIENCE' | 'CYBER'>('ALL');
   
   const [decryptionRate, setDecryptionRate] = useState(99.6);
   const [scanPulse, setScanPulse] = useState(false);
@@ -67,28 +89,53 @@ export function NewsWidget() {
     setScanPulse(true);
     try {
       const response = await fetch('/api/news');
-      if (!response.ok) throw new Error('API server unreachable');
-      const data = await response.json();
-      
-      if (Array.isArray(data) && data.length > 0) {
-        setNewsPool(data);
-        
-        // Initial slice: show top 5 items immediately
-        const count = Math.min(5, data.length);
-        setVisibleNews(data.slice(0, count));
-        setPoolIndex(count);
+      let data = [];
+      if (response.ok) {
+        data = await response.json();
       } else {
-        // Fallback
-        setNewsPool(FALLBACK_DECK_ALERTS);
-        setVisibleNews(FALLBACK_DECK_ALERTS);
-        setPoolIndex(FALLBACK_DECK_ALERTS.length);
+        console.error('API server returned error status:', response.status);
       }
+      
+      // Map cyber data with dynamic timestamps so they list chronologically with RSS news
+      const baseTime = Math.floor(Date.now() / 1000);
+      const freshCyber = CYBER_NEWS_DATA.map((item, index) => ({
+        ...item,
+        time: baseTime - (index * 600) // spread out 10 mins apart
+      }));
+
+      let combined: NewsItem[] = [];
+      if (Array.isArray(data) && data.length > 0) {
+        combined = [...data, ...freshCyber].sort((a, b) => (b.time || 0) - (a.time || 0));
+      } else {
+        combined = freshCyber;
+      }
+
+      setNewsPool(combined);
+      
+      // Set initial buffer items matching the active filter
+      const matchingPool = combined.filter(item => {
+        if (filter === 'WORLD') return item.category === 'WORLD';
+        if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
+        if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+        return true;
+      });
+
+      const count = Math.min(5, matchingPool.length);
+      setVisibleNews(matchingPool.slice(0, count));
+      setPoolIndex(count);
+      
       setDecryptionRate(parseFloat((98 + Math.random() * 1.95).toFixed(2)));
     } catch (err) {
       console.error('Failed to parse remote global RSS news stream:', err);
-      setNewsPool(FALLBACK_DECK_ALERTS);
-      setVisibleNews(FALLBACK_DECK_ALERTS);
-      setPoolIndex(FALLBACK_DECK_ALERTS.length);
+      // Fallback solely to mockup cybernet alerts so UI compiles and works flawlessly
+      const baseTime = Math.floor(Date.now() / 1000);
+      const freshCyber = CYBER_NEWS_DATA.map((item, index) => ({
+        ...item,
+        time: baseTime - (index * 600)
+      }));
+      setNewsPool(freshCyber);
+      setVisibleNews(freshCyber.slice(0, 5));
+      setPoolIndex(5);
     } finally {
       setTimeout(() => {
         setLoading(false);
@@ -105,6 +152,22 @@ export function NewsWidget() {
     }, 90000);
     return () => clearInterval(interval);
   }, []);
+
+  // When filter changes, pre-populate visibleNews with matching stories from the pool
+  useEffect(() => {
+    if (newsPool.length === 0) return;
+    
+    const matchingPool = newsPool.filter(item => {
+      if (filter === 'WORLD') return item.category === 'WORLD';
+      if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
+      if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+      return true;
+    });
+
+    const count = Math.min(5, matchingPool.length);
+    setVisibleNews(matchingPool.slice(0, count));
+    setPoolIndex(count);
+  }, [filter, newsPool]);
 
   // 2. "One By One All Time" real-time news intercept injector
   useEffect(() => {
@@ -123,13 +186,23 @@ export function NewsWidget() {
     }, 1000);
 
     return () => clearInterval(ticker);
-  }, [newsPool, poolIndex]);
+  }, [newsPool, poolIndex, filter]);
 
   const injectNextStory = () => {
     if (newsPool.length === 0) return;
 
-    // Retrieve next item from newsPool list
-    const nextItem = newsPool[poolIndex % newsPool.length];
+    // Filter newsPool to find eligible items based on the active filter
+    const matchingPool = newsPool.filter(item => {
+      if (filter === 'WORLD') return item.category === 'WORLD';
+      if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
+      if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
+      return true;
+    });
+
+    if (matchingPool.length === 0) return;
+
+    // Retrieve next item from matchingPool list
+    const nextItem = matchingPool[poolIndex % matchingPool.length];
     setPoolIndex(prev => prev + 1);
 
     // Briefly flash the intercept banner to mimic real-time satellite decryption
@@ -146,7 +219,7 @@ export function NewsWidget() {
 
     // Prepend to visible screen, shifting items. Keep max 5 items to block pagination scrollbars
     setVisibleNews(prev => {
-      // Avoid duplicate sibling stories if pool is very small
+      // Avoid duplicate sibling stories
       if (prev.length > 0 && prev[0].title === nextItem.title) {
         return prev;
       }
@@ -165,9 +238,9 @@ export function NewsWidget() {
         };
       case 'BUSINESS':
         return {
-          bg: 'bg-amber-950/30 border-amber-500/30 hover:border-amber-500 text-[#e0e0e0]',
+          bg: 'bg-[#1e1302]/30 border-amber-500/30 hover:border-amber-500 text-[#e0e0e0]',
           label: 'RECON // FINANCIALS',
-          labelColor: 'text-amber-400',
+          labelColor: 'text-amber-500',
           icon: <Shield size={10} className="text-amber-500" />
         };
       case 'TECHNOLOGY':
@@ -191,6 +264,13 @@ export function NewsWidget() {
           labelColor: 'text-matrix-green [text-shadow:0_0_3px_#00ff66]',
           icon: <Globe size={10} className="text-matrix-green" />
         };
+      case 'CYBER':
+        return {
+          bg: 'bg-yellow-950/20 border-yellow-500/30 hover:border-yellow-500 text-[#e0e0e0]',
+          label: 'ALERT // CYBERSEC INTEL',
+          labelColor: 'text-yellow-400 [text-shadow:0_0_3px_rgba(234,179,8,0.5)]',
+          icon: <Cpu size={10} className="text-yellow-500 animate-pulse" />
+        };
       default:
         return {
           bg: 'bg-neutral-950/40 border-matrix-green/20 hover:border-matrix-green text-[#e0e0e0]',
@@ -205,7 +285,7 @@ export function NewsWidget() {
   const filteredList = visibleNews.filter(item => {
     if (filter === 'WORLD') return item.category === 'WORLD';
     if (filter === 'TECH_SCIENCE') return item.category === 'TECHNOLOGY' || item.category === 'SCIENCE';
-    if (filter === 'ENTER_BIZ') return item.category === 'BUSINESS' || item.category === 'ENTERTAINMENT';
+    if (filter === 'CYBER') return item.category === 'CYBER' || item.type === 'cybernet';
     return true;
   });
 
@@ -271,10 +351,10 @@ export function NewsWidget() {
           TECH/SCI
         </button>
         <button 
-          onClick={() => setFilter('ENTER_BIZ')}
-          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'ENTER_BIZ' ? 'bg-amber-950/40 text-amber-400 border-amber-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
+          onClick={() => setFilter('CYBER')}
+          className={`px-1.5 py-0.5 rounded text-[8px] font-bold tracking-widest uppercase border transition-all cursor-pointer ${filter === 'CYBER' ? 'bg-yellow-950/40 text-yellow-500 border-yellow-500/40' : 'text-neutral-500 border-transparent hover:text-neutral-300'}`}
         >
-          ENT/BIZ
+          CYBER
         </button>
       </div>
 
@@ -353,7 +433,7 @@ export function NewsWidget() {
 
                   <div className="flex items-center justify-between mt-1 select-none">
                     <span className="text-[7px] text-[#707070] font-mono font-bold uppercase tracking-widest">
-                      SOURCE: {item.by || 'BBC NEWS'}
+                      SOURCE: {item.by || 'WORLD INTEL'}
                     </span>
                     
                     {item.url && (
@@ -383,3 +463,4 @@ export function NewsWidget() {
     </div>
   );
 }
+
