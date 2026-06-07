@@ -689,7 +689,7 @@ function CyberLabApp() {
   };
 
   return (
-    <div className="crt-container min-h-screen flex flex-col bg-[#020202] text-matrix-green font-mono selection:bg-matrix-green selection:text-black relative overflow-hidden">
+    <div className="crt-container h-screen max-h-screen w-screen flex flex-col bg-[#020202] text-matrix-green font-mono selection:bg-matrix-green selection:text-black relative overflow-hidden">
       {/* Background Watermark */}
       <div 
         className="absolute inset-0 z-0 opacity-[0.03] pointer-events-none bg-center bg-no-repeat grayscale"

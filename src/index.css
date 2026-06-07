@@ -13,8 +13,13 @@
 }
 
 @layer base {
+  html, body, #root {
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+  }
   body {
-    @apply bg-pitch-black text-[#E0E0E0] font-mono select-none overflow-x-hidden;
+    @apply bg-pitch-black text-[#E0E0E0] font-mono select-none;
     background-image: 
       radial-gradient(circle at 50% 50%, rgba(10, 10, 10, 0.8) 0%, rgba(5, 5, 5, 1) 100%),
       linear-gradient(rgba(255, 49, 49, 0.05) 1px, transparent 1px),
